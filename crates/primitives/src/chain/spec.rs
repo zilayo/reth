@@ -461,6 +461,100 @@ pub static BASE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     .into()
 });
 
+/// The Mode mainnet spec
+#[cfg(feature = "optimism")]
+pub static MODE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: Chain::mode(), //@todo revert to official crate
+        genesis: serde_json::from_str(include_str!("../../res/genesis/mode.json"))
+            .expect("Can't deserialize Mode genesis json"),
+        genesis_hash: Some(b256!(
+            "b0f682e12fc555fd5ce8fce51a59a67d66a5b46be28611a168260a549dac8a9b"
+        )),
+        fork_timestamps: ForkTimestamps::default(),
+        paris_block_and_final_difficulty: Some((0, U256::from(0))),
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::MuirGlacier, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (Hardfork::ArrowGlacier, ForkCondition::Block(0)),
+            (Hardfork::GrayGlacier, ForkCondition::Block(0)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: Some(0), total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Bedrock, ForkCondition::Block(0)),
+            (Hardfork::Regolith, ForkCondition::Timestamp(0)),
+        ]),
+        base_fee_params: BaseFeeParamsKind::Variable(
+            vec![
+                (Hardfork::London, BaseFeeParams::optimism()),
+                (Hardfork::Canyon, BaseFeeParams::optimism_canyon()),
+            ]
+            .into(),
+        ),
+        prune_delete_limit: 1700,
+        snapshot_block_interval: 1_000_000,
+        ..Default::default()
+    }
+    .into()
+});
+
+/// The Mode Sepolia spec
+#[cfg(feature = "optimism")]
+pub static MODE_SEPOLIA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
+    ChainSpec {
+        chain: Chain::mode_sepolia(), //@todo revert to official crate
+        genesis: serde_json::from_str(include_str!("../../res/genesis/sepolia_mode.json"))
+            .expect("Can't deserialize Mode Sepolia genesis json"),
+        genesis_hash: Some(b256!(
+            "13c352562289a88ed33087a51b6b6c859a27709c8555c9def7cb9757c043acad"
+        )),
+        fork_timestamps: ForkTimestamps::default(),
+        paris_block_and_final_difficulty: Some((0, U256::from(0))),
+        hardforks: BTreeMap::from([
+            (Hardfork::Frontier, ForkCondition::Block(0)),
+            (Hardfork::Homestead, ForkCondition::Block(0)),
+            (Hardfork::Tangerine, ForkCondition::Block(0)),
+            (Hardfork::SpuriousDragon, ForkCondition::Block(0)),
+            (Hardfork::Byzantium, ForkCondition::Block(0)),
+            (Hardfork::Constantinople, ForkCondition::Block(0)),
+            (Hardfork::Petersburg, ForkCondition::Block(0)),
+            (Hardfork::Istanbul, ForkCondition::Block(0)),
+            (Hardfork::MuirGlacier, ForkCondition::Block(0)),
+            (Hardfork::Berlin, ForkCondition::Block(0)),
+            (Hardfork::London, ForkCondition::Block(0)),
+            (Hardfork::ArrowGlacier, ForkCondition::Block(0)),
+            (Hardfork::GrayGlacier, ForkCondition::Block(0)),
+            (
+                Hardfork::Paris,
+                ForkCondition::TTD { fork_block: Some(0), total_difficulty: U256::from(0) },
+            ),
+            (Hardfork::Bedrock, ForkCondition::Block(0)),
+            (Hardfork::Regolith, ForkCondition::Timestamp(0)),
+        ]),
+        base_fee_params: BaseFeeParamsKind::Variable(
+            vec![
+                (Hardfork::London, BaseFeeParams::optimism()),
+                (Hardfork::Canyon, BaseFeeParams::optimism_canyon()),
+            ]
+            .into(),
+        ),
+        prune_delete_limit: 1700,
+        snapshot_block_interval: 1_000_000,
+        ..Default::default()
+    }
+    .into()
+});
+
 /// A wrapper around [BaseFeeParams] that allows for specifying constant or dynamic EIP-1559
 /// parameters based on the active [Hardfork].
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -2419,6 +2513,18 @@ Post-merge hard forks (timestamp based):
         );
     }
 
+    #[cfg(feature = "optimism")]
+    #[test]
+    fn mode_sepolia_forkids() {
+        test_fork_ids(
+            &MODE_SEPOLIA,
+            &[(
+                Head { number: 0, ..Default::default() },
+                ForkId { hash: ForkHash([0xbf, 0xf4, 0xd2, 0x3a]), next: 0 },
+            )],
+        );
+    }
+
     /// Checks that time-based forks work
     ///
     /// This is based off of the test vectors here: https://github.com/ethereum/go-ethereum/blob/5c8cc10d1e05c23ff1108022f4150749e73c0ca1/core/forkid/forkid_test.go#L155-L188
@@ -3182,6 +3288,22 @@ Post-merge hard forks (timestamp based):
         let base_fee =
             genesis.next_block_base_fee(BASE_SEPOLIA.base_fee_params(genesis.timestamp)).unwrap();
         // <https://base-sepolia.blockscout.com/block/1>
+        assert_eq!(base_fee, 980000000);
+    }
+
+    #[test]
+    #[cfg(feature = "optimism")]
+    fn mode_sepolia_genesis() {
+        let genesis = MODE_SEPOLIA.genesis_header();
+        assert_eq!(
+            genesis.hash_slow(),
+            "0x13c352562289a88ed33087a51b6b6c859a27709c8555c9def7cb9757c043acad"
+                .parse::<B256>()
+                .unwrap()
+        );
+        let base_fee =
+            genesis.next_block_base_fee(MODE_SEPOLIA.base_fee_params(genesis.timestamp)).unwrap();
+        // <https://sepolia.explorer.mode.network/block/1>
         assert_eq!(base_fee, 980000000);
     }
 }

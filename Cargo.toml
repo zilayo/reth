@@ -178,7 +178,8 @@ revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "main", 
 revm-inspectors = { git = "https://github.com/paradigmxyz/evm-inspectors", rev = "c85c806" }
 
 # eth
-alloy-chains = { version = "0.1", feature = ["serde", "rlp", "arbitrary"] }
+alloy-chains = { git = "https://github.com/alloy-rs/chains.git", branch = "main", feature = ["serde", "rlp", "arbitrary"] } # @todo update back to official crate
+# alloy-chains = { version = "0.1", feature = ["serde", "rlp", "arbitrary"] }
 alloy-primitives = "0.6"
 alloy-dyn-abi = "0.6"
 alloy-sol-types = "0.6"
