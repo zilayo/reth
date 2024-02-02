@@ -471,7 +471,7 @@ pub static MODE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
         genesis_hash: Some(b256!(
             "b0f682e12fc555fd5ce8fce51a59a67d66a5b46be28611a168260a549dac8a9b"
         )),
-        fork_timestamps: ForkTimestamps::default(),
+        fork_timestamps: ForkTimestamps::default().shanghai(1704992401).canyon(1704992401),
         paris_block_and_final_difficulty: Some((0, U256::from(0))),
         hardforks: BTreeMap::from([
             (Hardfork::Frontier, ForkCondition::Block(0)),
@@ -493,6 +493,8 @@ pub static MODE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
             ),
             (Hardfork::Bedrock, ForkCondition::Block(0)),
             (Hardfork::Regolith, ForkCondition::Timestamp(0)),
+            (Hardfork::Shanghai, ForkCondition::Timestamp(1704992401)),
+            (Hardfork::Canyon, ForkCondition::Timestamp(1704992401)),
         ]),
         base_fee_params: BaseFeeParamsKind::Variable(
             vec![
@@ -2508,6 +2510,28 @@ Post-merge hard forks (timestamp based):
                 (
                     Head { number: 6, timestamp: 1707238800, ..Default::default() },
                     ForkId { hash: ForkHash([0x21, 0x11, 0x52, 0x97]), next: 0 },
+                ),
+            ],
+        );
+    }
+
+    #[cfg(feature = "optimism")]
+    #[test]
+    fn mode_mainnet_forkids() {
+        test_fork_ids(
+            &MODE_MAINNET,
+            &[
+                (
+                    Head { number: 0, ..Default::default() },
+                    ForkId { hash: ForkHash([0x3c, 0xc7, 0x43, 0x5b]), next: 1704992401 },
+                ),
+                (
+                    Head { number: 1, timestamp: 1704992400, ..Default::default() },
+                    ForkId { hash: ForkHash([0x3c, 0xc7, 0x43, 0x5b]), next: 1704992401 },
+                ),
+                (
+                    Head { number: 2, timestamp: 1704992401, ..Default::default() },
+                    ForkId { hash: ForkHash([0xf6, 0x78, 0xe2, 0xca]), next: 0 },
                 ),
             ],
         );
