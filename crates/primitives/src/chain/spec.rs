@@ -465,7 +465,7 @@ pub static BASE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 #[cfg(feature = "optimism")]
 pub static MODE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
-        chain: Chain::mode(), //@todo revert to official crate
+        chain: Chain::mode(),
         genesis: serde_json::from_str(include_str!("../../res/genesis/mode.json"))
             .expect("Can't deserialize Mode genesis json"),
         genesis_hash: Some(b256!(
@@ -514,7 +514,7 @@ pub static MODE_MAINNET: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
 #[cfg(feature = "optimism")]
 pub static MODE_SEPOLIA: Lazy<Arc<ChainSpec>> = Lazy::new(|| {
     ChainSpec {
-        chain: Chain::mode_sepolia(), //@todo revert to official crate
+        chain: Chain::mode_sepolia(),
         genesis: serde_json::from_str(include_str!("../../res/genesis/sepolia_mode.json"))
             .expect("Can't deserialize Mode Sepolia genesis json"),
         genesis_hash: Some(b256!(
