@@ -168,6 +168,18 @@ impl Discv5 {
         let (enr, bc_enr, fork_key, rlpx_ip_mode) = build_local_enr(sk, &discv5_config);
 
         trace!(target: "net::discv5",
+            ?discv5_config,
+            "discv5 config");
+
+        trace!(target: "net::discv5",
+            ?bc_enr,
+            "bc_enr");
+
+        trace!(target: "net::discv5",
+            ?rlpx_ip_mode,
+            "rlpx_ip_mode");
+
+        trace!(target: "net::discv5",
             ?enr,
             "local ENR"
         );
