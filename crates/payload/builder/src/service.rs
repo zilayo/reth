@@ -9,11 +9,11 @@ use crate::{
 };
 use alloy_rpc_types::engine::PayloadId;
 use futures_util::{future::FutureExt, Stream, StreamExt};
+use reth_chain_state::CanonStateNotification;
 use reth_payload_primitives::{
     BuiltPayload, Events, PayloadBuilder, PayloadBuilderAttributes, PayloadBuilderError,
     PayloadEvents, PayloadKind, PayloadTypes,
 };
-use reth_provider::CanonStateNotification;
 use std::{
     fmt,
     future::Future,
@@ -156,6 +156,18 @@ where
         let _ = self.to_service.send(PayloadServiceCommand::Subscribe(tx));
         Ok(PayloadEvents { receiver: rx.await? })
     }
+
+    /// Returns the payload attributes associated with the given identifier.
+    ///
+    /// Note: this returns the attributes of the payload and does not resolve the job.
+    async fn payload_attributes(
+        &self,
+        id: PayloadId,
+    ) -> Option<Result<T::PayloadBuilderAttributes, PayloadBuilderError>> {
+        let (tx, rx) = oneshot::channel();
+        self.to_service.send(PayloadServiceCommand::PayloadAttributes(id, tx)).ok()?;
+        rx.await.ok()?
+    }
 }
 
 impl<T> PayloadBuilderHandle<T>
@@ -168,18 +180,6 @@ where
     /// building flow See [`PayloadBuilderService::poll`] for implementation details.
     pub const fn new(to_service: mpsc::UnboundedSender<PayloadServiceCommand<T>>) -> Self {
         Self { to_service }
-    }
-
-    /// Returns the payload attributes associated with the given identifier.
-    ///
-    /// Note: this returns the attributes of the payload and does not resolve the job.
-    async fn payload_attributes(
-        &self,
-        id: PayloadId,
-    ) -> Option<Result<T::PayloadBuilderAttributes, PayloadBuilderError>> {
-        let (tx, rx) = oneshot::channel();
-        self.to_service.send(PayloadServiceCommand::PayloadAttributes(id, tx)).ok()?;
-        rx.await.ok()?
     }
 }
 
