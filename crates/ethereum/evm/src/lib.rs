@@ -80,7 +80,10 @@ impl ConfigureEvmEnv for EthEvmConfig {
         let spec = config::revm_spec(self.chain_spec(), header);
 
         // configure evm env based on parent block
-        let cfg_env = CfgEnv::new().with_chain_id(self.chain_spec.chain().id()).with_spec(spec);
+        let mut cfg_env = CfgEnv::new().with_chain_id(self.chain_spec.chain().id()).with_spec(spec);
+        // this one is effective; todo: disable after system transaction
+        cfg_env.disable_base_fee = true;
+        cfg_env.disable_eip3607 = true;
 
         let block_env = BlockEnv {
             number: header.number(),

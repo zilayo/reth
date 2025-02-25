@@ -8,7 +8,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use alloy_consensus::{Header, Transaction};
 use alloy_eips::{eip4895::Withdrawals, eip6110, eip7685::Requests};
 use alloy_evm::FromRecoveredTx;
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{address, Address, B256};
 use reth_chainspec::{ChainSpec, EthereumHardfork, EthereumHardforks, MAINNET};
 use reth_evm::{
     execute::{
@@ -187,10 +187,13 @@ where
                 transaction_gas_limit: tx.gas_limit(),
                 block_available_gas,
             }
-            .into())
+            .into());
         }
 
+        const HL_SYSETM_TX_FROM_ADDR: Address = address!("2222222222222222222222222222222222222222");
+
         let hash = tx.hash();
+        let is_system_transaction = tx.signer() == HL_SYSETM_TX_FROM_ADDR;
 
         // Execute transaction.
         let result_and_state =
@@ -203,7 +206,9 @@ where
         let gas_used = result.gas_used();
 
         // append gas used
-        self.gas_used += gas_used;
+        if !is_system_transaction {
+            self.gas_used += gas_used;
+        }
 
         // Push transaction changeset and calculate header bloom filter for receipt.
         self.receipts.push(Receipt {

@@ -1,5 +1,5 @@
 use crate::primitives::alloy_primitives::{BlockNumber, StorageKey, StorageValue};
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{keccak256, Address, B256, U256};
 use core::ops::{Deref, DerefMut};
 use reth_primitives_traits::Account;
 use reth_storage_api::{AccountReader, BlockHashReader, StateProvider};
@@ -159,7 +159,11 @@ impl<DB: EvmStateProvider> DatabaseRef for StateProviderDatabase<DB> {
     ///
     /// Returns `Ok` with the block hash if found, or the default hash otherwise.
     fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
-        // Get the block hash or default hash with an attempt to convert U256 block number to u64
-        Ok(self.0.block_hash(number)?.unwrap_or_default())
+        if number >= 270000 {
+            // Get the block hash or default hash with an attempt to convert U256 block number to u64
+            Ok(self.0.block_hash(number)?.unwrap_or_default())
+        } else {
+            Ok(keccak256(number.to_string().as_bytes()))
+        }
     }
 }

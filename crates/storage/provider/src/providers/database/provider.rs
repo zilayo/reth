@@ -3067,7 +3067,7 @@ impl<TX: DbTxMut + DbTx + 'static, N: NodeTypesForProvider + 'static> BlockWrite
             return Ok(())
         }
 
-        let first_number = blocks.first().unwrap().number();
+        let first_number: u64 = blocks.first().unwrap().number();
 
         let last = blocks.last().unwrap();
         let last_block_number = last.number();

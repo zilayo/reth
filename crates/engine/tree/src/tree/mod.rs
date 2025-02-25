@@ -2892,6 +2892,7 @@ where
                     task_elapsed = ?time_from_last_update,
                     "State root task finished"
                 );
+                let task_state_root = B256::ZERO;
 
                 if task_state_root != sealed_block.header().state_root() ||
                     self.config.always_compare_trie_updates()

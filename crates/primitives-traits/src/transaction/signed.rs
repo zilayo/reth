@@ -12,6 +12,7 @@ use alloy_consensus::{
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{keccak256, Address, PrimitiveSignature as Signature, TxHash, B256};
 use core::hash::Hash;
+use revm_primitives::{address, U256};
 
 /// Helper trait that unifies all behaviour required by block to support full node operations.
 pub trait FullSignedTx: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
@@ -166,6 +167,11 @@ impl SignedTransaction for PooledTransaction {
         &self,
         buf: &mut Vec<u8>,
     ) -> Result<Address, RecoveryError> {
+        let signature = self.signature();
+        if signature.r() == U256::from(1) && signature.s() == U256::from(1) && signature.v() == true
+        {
+            return Ok(address!("2222222222222222222222222222222222222222"));
+        }
         match self {
             Self::Legacy(tx) => tx.tx().encode_for_signing(buf),
             Self::Eip2930(tx) => tx.tx().encode_for_signing(buf),
@@ -174,7 +180,7 @@ impl SignedTransaction for PooledTransaction {
             Self::Eip4844(tx) => tx.tx().encode_for_signing(buf),
         }
         let signature_hash = keccak256(buf);
-        recover_signer_unchecked(self.signature(), signature_hash)
+        recover_signer_unchecked(signature, signature_hash)
     }
 }
 

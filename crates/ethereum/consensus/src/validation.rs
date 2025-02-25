@@ -28,7 +28,7 @@ where
         return Err(ConsensusError::BlockGasUsed {
             gas: GotExpected { got: cumulative_gas_used, expected: block.header().gas_used() },
             gas_spent_by_tx: gas_spent_by_transactions(receipts),
-        })
+        });
     }
 
     // Before Byzantium, receipts contained state root that would mean that expensive
@@ -36,24 +36,29 @@ where
     // transaction This was replaced with is_success flag.
     // See more about EIP here: https://eips.ethereum.org/EIPS/eip-658
     if chain_spec.is_byzantium_active_at_block(block.header().number()) {
-        if let Err(error) =
-            verify_receipts(block.header().receipts_root(), block.header().logs_bloom(), receipts)
-        {
+        // Filter out system tx receipts
+        let receipts: Vec<R> =
+            receipts.iter().filter(|r| r.cumulative_gas_used() != 0).cloned().collect::<Vec<_>>();
+        if let Err(error) = verify_receipts(
+            block.header().receipts_root(),
+            block.header().logs_bloom(),
+            receipts.as_slice(),
+        ) {
             tracing::debug!(%error, ?receipts, "receipts verification failed");
-            return Err(error)
+            return Err(error);
         }
     }
 
     // Validate that the header requests hash matches the calculated requests hash
     if chain_spec.is_prague_active_at_timestamp(block.header().timestamp()) {
         let Some(header_requests_hash) = block.header().requests_hash() else {
-            return Err(ConsensusError::RequestsHashMissing)
+            return Err(ConsensusError::RequestsHashMissing);
         };
         let requests_hash = requests.requests_hash();
         if requests_hash != header_requests_hash {
             return Err(ConsensusError::BodyRequestsHashDiff(
                 GotExpected::new(requests_hash, header_requests_hash).into(),
-            ))
+            ));
         }
     }
 
@@ -95,13 +100,13 @@ fn compare_receipts_root_and_logs_bloom(
     if calculated_receipts_root != expected_receipts_root {
         return Err(ConsensusError::BodyReceiptRootDiff(
             GotExpected { got: calculated_receipts_root, expected: expected_receipts_root }.into(),
-        ))
+        ));
     }
 
     if calculated_logs_bloom != expected_logs_bloom {
         return Err(ConsensusError::BodyBloomLogDiff(
             GotExpected { got: calculated_logs_bloom, expected: expected_logs_bloom }.into(),
-        ))
+        ));
     }
 
     Ok(())

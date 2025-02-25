@@ -20,3 +20,5 @@ reth-primitives-traits.workspace = true
 # alloy
 alloy-rpc-types-engine.workspace = true
 alloy-consensus.workspace = true
+alloy-eips.workspace = true
+alloy-primitives.workspace = true

@@ -12,7 +12,8 @@ use alloy_eips::{
 };
 use alloy_evm::FromRecoveredTx;
 use alloy_primitives::{
-    keccak256, Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
+    address, keccak256, Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind,
+    B256, U256,
 };
 use alloy_rlp::{Decodable, Encodable};
 use core::hash::{Hash, Hasher};
@@ -329,9 +330,9 @@ impl Hash for TransactionSigned {
 
 impl PartialEq for TransactionSigned {
     fn eq(&self, other: &Self) -> bool {
-        self.signature == other.signature &&
-            self.transaction == other.transaction &&
-            self.tx_hash() == other.tx_hash()
+        self.signature == other.signature
+            && self.transaction == other.transaction
+            && self.tx_hash() == other.tx_hash()
     }
 }
 
@@ -579,13 +580,13 @@ impl<'a> arbitrary::Arbitrary<'a> for TransactionSigned {
         )
         .unwrap();
 
-        Ok(Self { transaction, signature, hash: Default::default() })
+        Ok(Self { transaction, signature, ..Default::default() })
     }
 }
 
 impl InMemorySize for TransactionSigned {
     fn size(&self) -> usize {
-        let Self { hash: _, signature, transaction } = self;
+        let Self { hash: _, signature, transaction, .. } = self;
         self.tx_hash().size() + signature.size() + transaction.size()
     }
 }
@@ -614,42 +615,26 @@ impl Decodable2718 for TransactionSigned {
             TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
             TxType::Eip2930 => {
                 let (tx, signature) = TxEip2930::rlp_decode_with_signature(buf)?;
-                Ok(Self {
-                    transaction: Transaction::Eip2930(tx),
-                    signature,
-                    hash: Default::default(),
-                })
+                Ok(Self { transaction: Transaction::Eip2930(tx), signature, ..Default::default() })
             }
             TxType::Eip1559 => {
                 let (tx, signature) = TxEip1559::rlp_decode_with_signature(buf)?;
-                Ok(Self {
-                    transaction: Transaction::Eip1559(tx),
-                    signature,
-                    hash: Default::default(),
-                })
+                Ok(Self { transaction: Transaction::Eip1559(tx), signature, ..Default::default() })
             }
             TxType::Eip4844 => {
                 let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
-                Ok(Self {
-                    transaction: Transaction::Eip4844(tx),
-                    signature,
-                    hash: Default::default(),
-                })
+                Ok(Self { transaction: Transaction::Eip4844(tx), signature, ..Default::default() })
             }
             TxType::Eip7702 => {
                 let (tx, signature) = TxEip7702::rlp_decode_with_signature(buf)?;
-                Ok(Self {
-                    transaction: Transaction::Eip7702(tx),
-                    signature,
-                    hash: Default::default(),
-                })
+                Ok(Self { transaction: Transaction::Eip7702(tx), signature, ..Default::default() })
             }
         }
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         let (tx, signature) = TxLegacy::rlp_decode_with_signature(buf)?;
-        Ok(Self { transaction: Transaction::Legacy(tx), signature, hash: Default::default() })
+        Ok(Self { transaction: Transaction::Legacy(tx), signature, ..Default::default() })
     }
 }
 
@@ -848,6 +833,13 @@ impl SignedTransaction for TransactionSigned {
     }
 
     fn recover_signer(&self) -> Result<Address, RecoveryError> {
+        const HL_SYSTEM_TX_FROM_ADDR: Address =
+            address!("2222222222222222222222222222222222222222");
+        let signature = self.signature();
+        if signature.r() == U256::from(1) && signature.s() == U256::from(1) && signature.v() == true
+        {
+            return Ok(HL_SYSTEM_TX_FROM_ADDR);
+        }
         let signature_hash = self.signature_hash();
         recover_signer(&self.signature, signature_hash)
     }

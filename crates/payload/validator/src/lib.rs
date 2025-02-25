@@ -12,6 +12,7 @@ pub mod cancun;
 pub mod prague;
 pub mod shanghai;
 
+use alloy_primitives::{address, Address};
 use alloy_rpc_types_engine::{ExecutionData, PayloadError};
 use reth_chainspec::EthereumHardforks;
 use reth_primitives::SealedBlock;
@@ -84,19 +85,41 @@ impl<ChainSpec: EthereumHardforks> ExecutionPayloadValidator<ChainSpec> {
         &self,
         payload: ExecutionData,
     ) -> Result<SealedBlock<reth_primitives::Block<T>>, PayloadError> {
-        let ExecutionData { payload, sidecar } = payload;
+        let ExecutionData { mut payload, sidecar } = payload;
 
         let expected_hash = payload.block_hash();
 
         // First parse the block
-        let sealed_block = payload.try_into_block_with_sidecar(&sidecar)?.seal_slow();
+        const HL_SYSTEM_TX_FROM_ADDR: Address =
+            address!("2222222222222222222222222222222222222222");
+        let transactions = payload.as_v1().transactions.clone();
+        let (normal, system) = transactions.into_iter().partition(|tx| {
+            let tx = T::decode_2718(&mut tx.iter().as_slice());
+            match tx {
+                Ok(tx) => {
+                    !matches!(tx.recover_signer(), Ok(address) if HL_SYSTEM_TX_FROM_ADDR == address)
+                }
+                Err(_) => true,
+            }
+        });
+        payload.as_v1_mut().transactions = normal;
+        let mut block = payload.try_into_block_with_sidecar(&sidecar)?;
+        block.body.transactions = system
+            .iter()
+            .map(|tx| {
+                T::decode_2718(&mut tx.iter().as_slice())
+                    .expect("transaction should be valid")
+            })
+            .chain(block.body.transactions)
+            .collect();
+        let sealed_block = block.seal_slow();
 
         // Ensure the hash included in the payload matches the block hash
         if expected_hash != sealed_block.hash() {
             return Err(PayloadError::BlockHash {
                 execution: sealed_block.hash(),
                 consensus: expected_hash,
-            })
+            });
         }
 
         shanghai::ensure_well_formed_fields(
