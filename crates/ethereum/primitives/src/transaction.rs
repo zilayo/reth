@@ -1,9 +1,9 @@
 use alloc::vec::Vec;
 pub use alloy_consensus::{transaction::PooledTransaction, TxType};
 use alloy_consensus::{
-    transaction::RlpEcdsaTx, BlobTransactionSidecar, SignableTransaction, Signed, TxEip1559,
-    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
-    Typed2718, TypedTransaction,
+    transaction::RlpEcdsaTx, BlobTransactionSidecar, SignableTransaction, Signed, Transaction as _,
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
+    TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
@@ -20,7 +20,10 @@ use core::hash::{Hash, Hasher};
 use reth_primitives_traits::{
     crypto::secp256k1::{recover_signer, recover_signer_unchecked},
     sync::OnceLock,
-    transaction::{error::TransactionConversionError, signed::RecoveryError},
+    transaction::{
+        error::TransactionConversionError,
+        signed::{is_impersonated_tx, RecoveryError},
+    },
     InMemorySize, SignedTransaction,
 };
 use revm_context::TxEnv;
@@ -836,8 +839,7 @@ impl SignedTransaction for TransactionSigned {
         const HL_SYSTEM_TX_FROM_ADDR: Address =
             address!("2222222222222222222222222222222222222222");
         let signature = self.signature();
-        if signature.r() == U256::from(1) && signature.s() == U256::from(1) && signature.v() == true
-        {
+        if is_impersonated_tx(signature, self.gas_price()) {
             return Ok(HL_SYSTEM_TX_FROM_ADDR);
         }
         let signature_hash = self.signature_hash();

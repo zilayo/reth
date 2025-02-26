@@ -7,7 +7,7 @@ use crate::{
 use alloc::{fmt, vec::Vec};
 use alloy_consensus::{
     transaction::{PooledTransaction, Recovered},
-    SignableTransaction,
+    SignableTransaction, Transaction,
 };
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{keccak256, Address, PrimitiveSignature as Signature, TxHash, B256};
@@ -17,6 +17,15 @@ use revm_primitives::{address, U256};
 /// Helper trait that unifies all behaviour required by block to support full node operations.
 pub trait FullSignedTx: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
 impl<T> FullSignedTx for T where T: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
+
+/// Check if the transaction is impersonated.
+/// Signature part is introduced in block_ingest, while the gas_price is trait of hyperliquid system transactions.
+pub fn is_impersonated_tx(signature: &Signature, gas_price: Option<u128>) -> bool {
+    signature.r() == U256::from(1)
+        && signature.s() == U256::from(1)
+        && signature.v() == true
+        && gas_price == Some(0u128)
+}
 
 /// A signed transaction.
 #[auto_impl::auto_impl(&, Arc)]
@@ -168,8 +177,7 @@ impl SignedTransaction for PooledTransaction {
         buf: &mut Vec<u8>,
     ) -> Result<Address, RecoveryError> {
         let signature = self.signature();
-        if signature.r() == U256::from(1) && signature.s() == U256::from(1) && signature.v() == true
-        {
+        if is_impersonated_tx(signature, self.gas_price()) {
             return Ok(address!("2222222222222222222222222222222222222222"));
         }
         match self {
