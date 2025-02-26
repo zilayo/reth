@@ -769,33 +769,28 @@ where
     }
 
     /// Handler for: `eth_sendTransaction`
-    async fn send_transaction(&self, request: TransactionRequest) -> RpcResult<B256> {
-        trace!(target: "rpc::eth", ?request, "Serving eth_sendTransaction");
-        Ok(EthTransactions::send_transaction(self, request).await?)
+    async fn send_transaction(&self, _request: TransactionRequest) -> RpcResult<B256> {
+        Err(internal_rpc_err("The node is read-only"))
     }
 
     /// Handler for: `eth_sendRawTransaction`
-    async fn send_raw_transaction(&self, tx: Bytes) -> RpcResult<B256> {
-        trace!(target: "rpc::eth", ?tx, "Serving eth_sendRawTransaction");
-        Ok(EthTransactions::send_raw_transaction(self, tx).await?)
+    async fn send_raw_transaction(&self, _tx: Bytes) -> RpcResult<B256> {
+        Err(internal_rpc_err("The node is read-only"))
     }
 
     /// Handler for: `eth_sign`
-    async fn sign(&self, address: Address, message: Bytes) -> RpcResult<Bytes> {
-        trace!(target: "rpc::eth", ?address, ?message, "Serving eth_sign");
-        Ok(EthTransactions::sign(self, address, message).await?)
+    async fn sign(&self, _address: Address, _message: Bytes) -> RpcResult<Bytes> {
+        Err(internal_rpc_err("The node is read-only"))
     }
 
     /// Handler for: `eth_signTransaction`
-    async fn sign_transaction(&self, request: TransactionRequest) -> RpcResult<Bytes> {
-        trace!(target: "rpc::eth", ?request, "Serving eth_signTransaction");
-        Ok(EthTransactions::sign_transaction(self, request).await?)
+    async fn sign_transaction(&self, _request: TransactionRequest) -> RpcResult<Bytes> {
+        Err(internal_rpc_err("The node is read-only"))
     }
 
     /// Handler for: `eth_signTypedData`
-    async fn sign_typed_data(&self, address: Address, data: TypedData) -> RpcResult<Bytes> {
-        trace!(target: "rpc::eth", ?address, ?data, "Serving eth_signTypedData");
-        Ok(EthTransactions::sign_typed_data(self, &data, address)?)
+    async fn sign_typed_data(&self, _address: Address, _data: TypedData) -> RpcResult<Bytes> {
+        Err(internal_rpc_err("The node is read-only"))
     }
 
     /// Handler for: `eth_getProof`
