@@ -6659,6 +6659,7 @@ dependencies = [
  "eyre",
  "futures",
  "jsonrpsee",
+ "jsonrpsee-core",
  "lz4_flex",
  "once_cell",
  "parking_lot",
