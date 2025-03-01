@@ -18,6 +18,9 @@ use revm_primitives::{address, U256};
 pub trait FullSignedTx: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
 impl<T> FullSignedTx for T where T: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
 
+/// Hyperliquid system transaction from address.
+pub const HL_SYSTEM_TX_FROM_ADDR: Address = address!("2222222222222222222222222222222222222222");
+
 /// Check if the transaction is impersonated.
 /// Signature part is introduced in block_ingest, while the gas_price is trait of hyperliquid system transactions.
 pub fn is_impersonated_tx(signature: &Signature, gas_price: Option<u128>) -> bool {
@@ -178,7 +181,7 @@ impl SignedTransaction for PooledTransaction {
     ) -> Result<Address, RecoveryError> {
         let signature = self.signature();
         if is_impersonated_tx(signature, self.gas_price()) {
-            return Ok(address!("2222222222222222222222222222222222222222"));
+            return Ok(HL_SYSTEM_TX_FROM_ADDR);
         }
         match self {
             Self::Legacy(tx) => tx.tx().encode_for_signing(buf),

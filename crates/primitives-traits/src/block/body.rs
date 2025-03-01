@@ -1,14 +1,14 @@
 //! Block body abstraction.
 
 use crate::{
-    transaction::signed::RecoveryError, BlockHeader, FullSignedTx, InMemorySize, MaybeSerde,
-    MaybeSerdeBincodeCompat, SignedTransaction,
+    transaction::signed::{RecoveryError, HL_SYSTEM_TX_FROM_ADDR},
+    BlockHeader, FullSignedTx, InMemorySize, MaybeSerde, MaybeSerdeBincodeCompat,
+    SignedTransaction,
 };
 use alloc::{fmt, vec::Vec};
 use alloy_consensus::{Transaction, Typed2718};
 use alloy_eips::{eip2718::Encodable2718, eip4895::Withdrawals};
 use alloy_primitives::{Address, Bytes, B256};
-use revm_primitives::address;
 
 /// Helper trait that unifies all behaviour required by transaction to support full node operations.
 pub trait FullBlockBody: BlockBody<Transaction: FullSignedTx> + MaybeSerdeBincodeCompat {}
@@ -82,12 +82,10 @@ pub trait BlockBody:
 
     /// Calculate the transaction root for the block body.
     fn calculate_tx_root(&self) -> B256 {
-        const HL_SYSETM_TX_FROM_ADDR: Address =
-            address!("2222222222222222222222222222222222222222");
         let transactions: Vec<Self::Transaction> = self
             .transactions()
             .into_iter()
-            .filter(|tx| !matches!(tx.recover_signer(), Ok(address) if HL_SYSETM_TX_FROM_ADDR == address))
+            .filter(|tx| !matches!(tx.recover_signer(), Ok(address) if HL_SYSTEM_TX_FROM_ADDR == address))
             .cloned()
             .collect::<Vec<_>>();
         alloy_consensus::proofs::calculate_transaction_root(transactions.as_slice())

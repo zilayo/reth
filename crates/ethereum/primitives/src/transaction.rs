@@ -12,8 +12,7 @@ use alloy_eips::{
 };
 use alloy_evm::FromRecoveredTx;
 use alloy_primitives::{
-    address, keccak256, Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind,
-    B256, U256,
+    keccak256, Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
 };
 use alloy_rlp::{Decodable, Encodable};
 use core::hash::{Hash, Hasher};
@@ -22,7 +21,7 @@ use reth_primitives_traits::{
     sync::OnceLock,
     transaction::{
         error::TransactionConversionError,
-        signed::{is_impersonated_tx, RecoveryError},
+        signed::{is_impersonated_tx, RecoveryError, HL_SYSTEM_TX_FROM_ADDR},
     },
     InMemorySize, SignedTransaction,
 };
@@ -836,8 +835,6 @@ impl SignedTransaction for TransactionSigned {
     }
 
     fn recover_signer(&self) -> Result<Address, RecoveryError> {
-        const HL_SYSTEM_TX_FROM_ADDR: Address =
-            address!("2222222222222222222222222222222222222222");
         let signature = self.signature();
         if is_impersonated_tx(signature, self.gas_price()) {
             return Ok(HL_SYSTEM_TX_FROM_ADDR);

@@ -8,7 +8,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use alloy_consensus::{Header, Transaction};
 use alloy_eips::{eip4895::Withdrawals, eip6110, eip7685::Requests};
 use alloy_evm::FromRecoveredTx;
-use alloy_primitives::{address, Address, B256};
+use alloy_primitives::{Address, B256};
 use reth_chainspec::{ChainSpec, EthereumHardfork, EthereumHardforks, MAINNET};
 use reth_evm::{
     execute::{
@@ -23,7 +23,7 @@ use reth_execution_types::BlockExecutionResult;
 use reth_primitives::{
     EthPrimitives, Receipt, Recovered, RecoveredBlock, SealedBlock, TransactionSigned,
 };
-use reth_primitives_traits::NodePrimitives;
+use reth_primitives_traits::{transaction::signed::HL_SYSTEM_TX_FROM_ADDR, NodePrimitives};
 use reth_revm::{context_interface::result::ResultAndState, db::State, DatabaseCommit};
 
 /// Factory for [`EthExecutionStrategy`].
@@ -190,10 +190,8 @@ where
             .into());
         }
 
-        const HL_SYSETM_TX_FROM_ADDR: Address = address!("2222222222222222222222222222222222222222");
-
         let hash = tx.hash();
-        let is_system_transaction = tx.signer() == HL_SYSETM_TX_FROM_ADDR;
+        let is_system_transaction = tx.signer() == HL_SYSTEM_TX_FROM_ADDR;
 
         // Execute transaction.
         let result_and_state =

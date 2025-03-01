@@ -92,11 +92,9 @@ similar-asserts.workspace = true
 parking_lot.workspace = true
 lz4_flex = "0.11.3"
 rmp-serde = "1.3.0"
-rmpv = "1.3.0"
 serde = { workspace = true, features = ["derive"] }
 reth-e2e-test-utils.workspace = true
 once_cell.workspace = true
-alloy-chains.workspace = true
 reth-ethereum-forks.workspace = true
 jsonrpsee.workspace = true
 reth-rpc-layer.workspace = true

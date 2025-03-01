@@ -12,10 +12,10 @@ pub mod cancun;
 pub mod prague;
 pub mod shanghai;
 
-use alloy_primitives::{address, Address};
 use alloy_rpc_types_engine::{ExecutionData, PayloadError};
 use reth_chainspec::EthereumHardforks;
 use reth_primitives::SealedBlock;
+use reth_primitives_traits::transaction::signed::HL_SYSTEM_TX_FROM_ADDR;
 use reth_primitives_traits::{Block, SignedTransaction};
 use std::sync::Arc;
 
@@ -90,8 +90,6 @@ impl<ChainSpec: EthereumHardforks> ExecutionPayloadValidator<ChainSpec> {
         let expected_hash = payload.block_hash();
 
         // First parse the block
-        const HL_SYSTEM_TX_FROM_ADDR: Address =
-            address!("2222222222222222222222222222222222222222");
         let transactions = payload.as_v1().transactions.clone();
         let (normal, system) = transactions.into_iter().partition(|tx| {
             let tx = T::decode_2718(&mut tx.iter().as_slice());
@@ -107,8 +105,7 @@ impl<ChainSpec: EthereumHardforks> ExecutionPayloadValidator<ChainSpec> {
         block.body.transactions = system
             .iter()
             .map(|tx| {
-                T::decode_2718(&mut tx.iter().as_slice())
-                    .expect("transaction should be valid")
+                T::decode_2718(&mut tx.iter().as_slice()).expect("transaction should be valid")
             })
             .chain(block.body.transactions)
             .collect();

@@ -1,10 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use alloy_consensus::transaction::RlpEcdsaTx;
 use alloy_consensus::{BlockBody, BlockHeader};
-use alloy_eips::Typed2718;
-use alloy_primitives::{address, Address, PrimitiveSignature, B256, U256};
+use alloy_primitives::{Address, PrimitiveSignature, B256, U256};
 use alloy_rpc_types::engine::{
     ExecutionPayloadEnvelopeV3, ForkchoiceState, PayloadAttributes, PayloadStatusEnum,
 };
@@ -16,7 +14,7 @@ use reth_node_builder::EngineTypes;
 use reth_node_builder::NodeTypesWithEngine;
 use reth_node_builder::{rpc::RethRpcAddOns, FullNode};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes, PayloadId};
-use reth_primitives::{Transaction, TransactionSigned};
+use reth_primitives::TransactionSigned;
 use reth_provider::{BlockHashReader, StageCheckpointReader};
 use reth_rpc_api::EngineApiClient;
 use reth_rpc_layer::AuthClientService;
@@ -53,23 +51,6 @@ async fn submit_payload<Engine: PayloadTypes + EngineTypes>(
     Ok(submission.latest_valid_hash.unwrap_or_default())
 }
 
-pub(crate) fn impersonated_hash(
-    this: &Transaction,
-    sender: Address,
-    signature: &PrimitiveSignature,
-) -> B256 {
-    let mut buffer = Vec::new();
-    let ty = this.ty();
-    match this {
-        Transaction::Legacy(tx) => tx.eip2718_encode_with_type(signature, ty, &mut buffer),
-        Transaction::Eip2930(tx) => tx.eip2718_encode_with_type(signature, ty, &mut buffer),
-        Transaction::Eip1559(tx) => tx.eip2718_encode_with_type(signature, ty, &mut buffer),
-        Transaction::Eip4844(tx) => tx.eip2718_encode_with_type(signature, ty, &mut buffer),
-        Transaction::Eip7702(tx) => tx.eip2718_encode_with_type(signature, ty, &mut buffer),
-    }
-    buffer.extend_from_slice(sender.as_ref());
-    B256::from_slice(alloy_primitives::utils::keccak256(&buffer).as_slice())
-}
 impl BlockIngest {
     pub(crate) fn collect_block(&self, height: u64) -> Option<super::serialized::Block> {
         let f = ((height - 1) / 1_000_000) * 1_000_000;
@@ -126,7 +107,6 @@ impl BlockIngest {
                 {
                     let BlockBody { transactions, ommers, withdrawals } =
                         std::mem::take(block.body_mut());
-                    let signer = address!("2222222222222222222222222222222222222222");
                     let signature = PrimitiveSignature::new(
                         // from anvil
                         U256::from(0x1),
@@ -136,8 +116,11 @@ impl BlockIngest {
                     let mut system_txs = vec![];
                     for transaction in original_block.system_txs {
                         let typed_transaction = transaction.tx.to_reth();
-                        let hash = impersonated_hash(&typed_transaction, signer, &signature);
-                        let tx = TransactionSigned::new(typed_transaction, signature, hash);
+                        let tx = TransactionSigned::new(
+                            typed_transaction,
+                            signature,
+                            Default::default(),
+                        );
                         system_txs.push(tx);
                     }
                     let mut txs = vec![];
