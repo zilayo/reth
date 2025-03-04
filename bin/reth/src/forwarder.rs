@@ -8,7 +8,6 @@ use jsonrpsee_core::{async_trait, client::ClientT, ClientError, RpcResult};
 
 #[rpc(server, namespace = "eth")]
 pub(crate) trait EthForwarderApi {
-    /// Returns block 0.
     #[method(name = "sendRawTransaction")]
     async fn send_raw_transaction(&self, tx: Bytes) -> RpcResult<B256>;
 }
