@@ -95,7 +95,7 @@ impl BlockIngest {
 
         loop {
             let Some(original_block) = self.collect_block(height) else {
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 continue;
             };
             let BlockInner::Reth115(mut block) = original_block.block;
