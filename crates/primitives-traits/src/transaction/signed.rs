@@ -89,6 +89,9 @@ pub trait SignedTransaction:
     /// Returns `None` if the transaction's signature is invalid, see also
     /// `reth_primitives::transaction::recover_signer_unchecked`.
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
+        if is_impersonated_tx(self.signature(), self.gas_price()) {
+            return Ok(HL_SYSTEM_TX_FROM_ADDR);
+        }
         self.recover_signer_unchecked_with_buf(&mut Vec::new()).map_err(|_| RecoveryError)
     }
 
