@@ -43,10 +43,11 @@ fn main() {
                 .node(EthereumNode::default())
                 .extend_rpc_modules(move |ctx| {
                     let upstream_rpc_url = ingest_args.upstream_rpc_url.clone();
-                    ctx.modules.remove_method_from_configured("eth_sendRawTransaction");
-                    ctx.modules.merge_configured(
-                        forwarder::EthForwarderExt::new(upstream_rpc_url).into_rpc(),
-                    )?;
+                    let rpc = forwarder::EthForwarderExt::new(upstream_rpc_url).into_rpc();
+                    for method_name in rpc.method_names() {
+                        ctx.modules.remove_method_from_configured(method_name);
+                    }
+                    ctx.modules.merge_configured(rpc)?;
 
                     info!("Transaction forwarder extension enabled");
                     Ok(())
