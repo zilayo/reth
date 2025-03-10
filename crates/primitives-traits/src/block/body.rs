@@ -1,7 +1,7 @@
 //! Block body abstraction.
 
 use crate::{
-    transaction::signed::{RecoveryError, HL_SYSTEM_TX_FROM_ADDR},
+    transaction::signed::{is_impersonated_tx, RecoveryError},
     BlockHeader, FullSignedTx, InMemorySize, MaybeSerde, MaybeSerdeBincodeCompat,
     SignedTransaction,
 };
@@ -85,7 +85,7 @@ pub trait BlockBody:
         let transactions: Vec<Self::Transaction> = self
             .transactions()
             .into_iter()
-            .filter(|tx| !matches!(tx.recover_signer(), Ok(address) if HL_SYSTEM_TX_FROM_ADDR == address))
+            .filter(|&tx| is_impersonated_tx(tx.signature(), tx.gas_price()).is_none())
             .cloned()
             .collect::<Vec<_>>();
         alloy_consensus::proofs::calculate_transaction_root(transactions.as_slice())

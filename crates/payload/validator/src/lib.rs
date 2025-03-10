@@ -15,7 +15,7 @@ pub mod shanghai;
 use alloy_rpc_types_engine::{ExecutionData, PayloadError};
 use reth_chainspec::EthereumHardforks;
 use reth_primitives::SealedBlock;
-use reth_primitives_traits::transaction::signed::HL_SYSTEM_TX_FROM_ADDR;
+use reth_primitives_traits::transaction::signed::is_impersonated_tx;
 use reth_primitives_traits::{Block, SignedTransaction};
 use std::sync::Arc;
 
@@ -94,9 +94,7 @@ impl<ChainSpec: EthereumHardforks> ExecutionPayloadValidator<ChainSpec> {
         let (normal, system) = transactions.into_iter().partition(|tx| {
             let tx = T::decode_2718(&mut tx.iter().as_slice());
             match tx {
-                Ok(tx) => {
-                    !matches!(tx.recover_signer(), Ok(address) if HL_SYSTEM_TX_FROM_ADDR == address)
-                }
+                Ok(tx) => is_impersonated_tx(tx.signature(), tx.gas_price()).is_none(),
                 Err(_) => true,
             }
         });

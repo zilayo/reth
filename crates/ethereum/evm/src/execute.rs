@@ -23,7 +23,7 @@ use reth_execution_types::BlockExecutionResult;
 use reth_primitives::{
     EthPrimitives, Receipt, Recovered, RecoveredBlock, SealedBlock, TransactionSigned,
 };
-use reth_primitives_traits::{transaction::signed::HL_SYSTEM_TX_FROM_ADDR, NodePrimitives};
+use reth_primitives_traits::{transaction::signed::is_impersonated_tx, NodePrimitives};
 use reth_revm::{context_interface::result::ResultAndState, db::State, DatabaseCommit};
 
 /// Factory for [`EthExecutionStrategy`].
@@ -191,7 +191,7 @@ where
         }
 
         let hash = tx.hash();
-        let is_system_transaction = tx.signer() == HL_SYSTEM_TX_FROM_ADDR;
+        let is_system_transaction = is_impersonated_tx(tx.signature(), tx.gas_price()).is_some();
 
         // Execute transaction.
         let result_and_state =
