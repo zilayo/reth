@@ -90,8 +90,6 @@ backon.workspace = true
 similar-asserts.workspace = true
 
 parking_lot.workspace = true
-lz4_flex = "0.11.3"
-rmp-serde = "1.3.0"
 serde = { workspace = true, features = ["derive"] }
 reth-e2e-test-utils.workspace = true
 once_cell.workspace = true
@@ -99,6 +97,10 @@ reth-ethereum-forks.workspace = true
 jsonrpsee.workspace = true
 jsonrpsee-core.workspace = true
 reth-rpc-layer.workspace = true
+
+lz4_flex.workspace = true
+rmp-serde.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
