@@ -587,14 +587,9 @@ where
 
     /// Returns a state hook to be used to send state updates to this task.
     pub fn state_hook(&self) -> impl OnStateHook {
-        let state_hook = self.state_hook_sender();
+        let _state_hook = self.state_hook_sender();
 
-        move |source: StateChangeSource, state: &EvmState| {
-            if let Err(error) =
-                state_hook.send(StateRootMessage::StateUpdate(source, state.clone()))
-            {
-                error!(target: "engine::root", ?error, "Failed to send state update");
-            }
+        move |_source: StateChangeSource, _state: &EvmState| {
         }
     }
 
