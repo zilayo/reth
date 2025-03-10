@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use alloy_consensus::{BlockBody, BlockHeader};
+use alloy_consensus::{BlockBody, BlockHeader, Transaction};
+use alloy_primitives::TxKind;
 use alloy_primitives::{Address, PrimitiveSignature, B256, U256};
 use alloy_rpc_types::engine::{
     ExecutionPayloadEnvelopeV3, ForkchoiceState, PayloadAttributes, PayloadStatusEnum,
@@ -19,11 +20,53 @@ use reth_provider::{BlockHashReader, StageCheckpointReader};
 use reth_rpc_api::EngineApiClient;
 use reth_rpc_layer::AuthClientService;
 use reth_stages::StageId;
-use tracing::debug;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info};
 
+use crate::serialized::TypedTransaction;
 use crate::serialized::{self, BlockInner};
 
 pub(crate) struct BlockIngest(pub PathBuf);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct EvmContract {
+    pub address: Address,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SpotToken {
+    pub index: u64,
+    #[serde(rename = "evmContract")]
+    pub evm_contract: Option<EvmContract>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SpotMeta {
+    tokens: Vec<SpotToken>,
+}
+
+async fn fetch_spot_meta(is_testnet: bool) -> Result<SpotMeta, Box<dyn std::error::Error>> {
+    let url = if is_testnet {
+        "https://api.hyperliquid-testnet.xyz"
+    } else {
+        "https://api.hyperliquid.xyz"
+    };
+    let url = format!("{}/info", url);
+    // post body: {"type": "spotMeta"}
+    let client = reqwest::Client::new();
+    let response = client.post(url).json(&serde_json::json!({"type": "spotMeta"})).send().await?;
+    Ok(response.json().await?)
+}
+
+fn to_evm_map(meta: &SpotMeta) -> std::collections::HashMap<Address, u64> {
+    let mut map = std::collections::HashMap::new();
+    for token in &meta.tokens {
+        if let Some(evm_contract) = &token.evm_contract {
+            map.insert(evm_contract.address, token.index);
+        }
+    }
+    map
+}
 
 async fn submit_payload<Engine: PayloadTypes + EngineTypes>(
     engine_api_client: &HttpClient<AuthClientService<HttpBackend>>,
@@ -92,6 +135,7 @@ impl BlockIngest {
             std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
 
         let engine_api = node.auth_server_handle().http_client();
+        let mut evm_map = to_evm_map(&fetch_spot_meta(node.chain_spec().chain_id() == 998).await?);
 
         loop {
             let Some(original_block) = self.collect_block(height) else {
@@ -107,14 +151,47 @@ impl BlockIngest {
                 {
                     let BlockBody { transactions, ommers, withdrawals } =
                         std::mem::take(block.body_mut());
-                    let signature = PrimitiveSignature::new(
-                        // from anvil
-                        U256::from(0x1),
-                        U256::from(0x1),
-                        true,
-                    );
                     let mut system_txs = vec![];
                     for transaction in original_block.system_txs {
+                        let s = match &transaction.tx {
+                            TypedTransaction::Legacy(tx) => match tx.input().len() {
+                                0 => U256::from(0x1),
+                                _ => {
+                                    let TxKind::Call(to) = tx.to else {
+                                        panic!("Unexpected contract creation");
+                                    };
+                                    loop {
+                                        match evm_map.get(&to).cloned() {
+                                            Some(s) => {
+                                                break {
+                                                    let mut addr = [0u8; 32];
+                                                    addr[12] = 0x20;
+                                                    addr[24..32].copy_from_slice(s.to_be_bytes().as_ref());
+                                                    U256::from_be_bytes(addr)
+                                                }
+                                            }
+                                            None => {
+                                                info!("Contract not found: {:?}, fetching again...", to);
+                                                evm_map = to_evm_map(
+                                                    &fetch_spot_meta(
+                                                        node.chain_spec().chain_id() == 998,
+                                                    )
+                                                    .await?,
+                                                );
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            _ => unreachable!(),
+                        };
+                        let signature = PrimitiveSignature::new(
+                            // from anvil
+                            U256::from(0x1),
+                            s,
+                            true,
+                        );
                         let typed_transaction = transaction.tx.to_reth();
                         let tx = TransactionSigned::new(
                             typed_transaction,
