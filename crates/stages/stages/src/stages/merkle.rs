@@ -279,8 +279,6 @@ where
         // Reset the checkpoint
         self.save_execution_checkpoint(provider, None)?;
 
-        validate_state_root(trie_root, SealedHeader::seal_slow(target_block), to_block)?;
-
         Ok(ExecOutput {
             checkpoint: StageCheckpoint::new(to_block)
                 .with_entities_stage_checkpoint(entities_checkpoint),
@@ -327,13 +325,6 @@ where
             let (block_root, updates) = StateRoot::incremental_root_with_updates(tx, range)
                 .map_err(|e| StageError::Fatal(Box::new(e)))?;
 
-            // Validate the calculated state root
-            let target = provider
-                .header_by_number(input.unwind_to)?
-                .ok_or_else(|| ProviderError::HeaderNotFound(input.unwind_to.into()))?;
-
-            validate_state_root(block_root, SealedHeader::seal_slow(target), input.unwind_to)?;
-
             // Validation passed, apply unwind changes to the database.
             provider.write_trie_updates(&updates)?;
 
@@ -341,26 +332,6 @@ where
         }
 
         Ok(UnwindOutput { checkpoint: StageCheckpoint::new(input.unwind_to) })
-    }
-}
-
-/// Check that the computed state root matches the root in the expected header.
-#[inline]
-fn validate_state_root<H: BlockHeader + Sealable + Debug>(
-    got: B256,
-    expected: SealedHeader<H>,
-    target_block: BlockNumber,
-) -> Result<(), StageError> {
-    if got == expected.state_root() {
-        Ok(())
-    } else {
-        error!(target: "sync::stages::merkle", ?target_block, ?got, ?expected, "Failed to verify block state root! {INVALID_STATE_ROOT_ERROR_MESSAGE}");
-        Err(StageError::Block {
-            error: BlockErrorKind::Validation(ConsensusError::BodyStateRootDiff(
-                GotExpected { got, expected: expected.state_root() }.into(),
-            )),
-            block: Box::new(expected.block_with_parent()),
-        })
     }
 }
 

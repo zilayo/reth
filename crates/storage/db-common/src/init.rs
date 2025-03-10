@@ -547,60 +547,6 @@ where
     Ok(())
 }
 
-/// Computes the state root (from scratch) based on the accounts and storages present in the
-/// database.
-fn compute_state_root<Provider>(provider: &Provider) -> eyre::Result<B256>
-where
-    Provider: DBProvider<Tx: DbTxMut> + TrieWriter,
-{
-    trace!(target: "reth::cli", "Computing state root");
-
-    let tx = provider.tx_ref();
-    let mut intermediate_state: Option<IntermediateStateRootState> = None;
-    let mut total_flushed_updates = 0;
-
-    loop {
-        match StateRootComputer::from_tx(tx)
-            .with_intermediate_state(intermediate_state)
-            .root_with_progress()?
-        {
-            StateRootProgress::Progress(state, _, updates) => {
-                let updated_len = provider.write_trie_updates(&updates)?;
-                total_flushed_updates += updated_len;
-
-                trace!(target: "reth::cli",
-                    last_account_key = %state.last_account_key,
-                    updated_len,
-                    total_flushed_updates,
-                    "Flushing trie updates"
-                );
-
-                intermediate_state = Some(*state);
-
-                if total_flushed_updates % SOFT_LIMIT_COUNT_FLUSHED_UPDATES == 0 {
-                    info!(target: "reth::cli",
-                        total_flushed_updates,
-                        "Flushing trie updates"
-                    );
-                }
-            }
-            StateRootProgress::Complete(root, _, updates) => {
-                let updated_len = provider.write_trie_updates(&updates)?;
-                total_flushed_updates += updated_len;
-
-                trace!(target: "reth::cli",
-                    %root,
-                    updated_len,
-                    total_flushed_updates,
-                    "State root has been computed"
-                );
-
-                return Ok(root)
-            }
-        }
-    }
-}
-
 /// Type to deserialize state root from state dump file.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct StateRoot {
