@@ -8,7 +8,7 @@ use reth_primitives::{Header, SealedHeader};
 use std::sync::Arc;
 
 /// Chains supported by reth. First value should be used as the default.
-pub const SUPPORTED_CHAINS: &[&str] = &["mainnet", "sepolia", "holesky", "dev"];
+pub const SUPPORTED_CHAINS: &[&str] = &["mainnet", "testnet", "sepolia", "holesky", "dev"];
 
 static GENESIS_HASH: B256 =
     b256!("d8fcc13b6a195b88b7b2da3722ff6cad767b13a8c1e9ffb1c73aa9d216d895f0");
@@ -92,6 +92,7 @@ pub static HL_MAINNET: Lazy<alloc::sync::Arc<ChainSpec>> = Lazy::new(|| {
 pub fn chain_value_parser(s: &str) -> eyre::Result<Arc<ChainSpec>, eyre::Error> {
     Ok(match s {
         "mainnet" => HL_MAINNET.clone(),
+        "testnet" => Arc::new(super::hl_testnet::load_hl_testnet()),
         "sepolia" => SEPOLIA.clone(),
         "holesky" => HOLESKY.clone(),
         "dev" => DEV.clone(),
