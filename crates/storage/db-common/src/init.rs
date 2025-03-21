@@ -19,8 +19,6 @@ use reth_provider::{
     StateWriter, StaticFileProviderFactory, StorageLocation, TrieWriter,
 };
 use reth_stages_types::{StageCheckpoint, StageId};
-use reth_trie::{IntermediateStateRootState, StateRoot as StateRootComputer, StateRootProgress};
-use reth_trie_db::DatabaseStateRoot;
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 use tracing::{debug, error, info, trace};
@@ -38,9 +36,6 @@ pub const DEFAULT_SOFT_LIMIT_BYTE_LEN_ACCOUNTS_CHUNK: usize = 1_000_000_000;
 // (14.05 GB OP mainnet state dump at Bedrock block / 4 007 565 accounts in file > 3.5 KB per
 // account)
 pub const AVERAGE_COUNT_ACCOUNTS_PER_GB_STATE_DUMP: usize = 285_228;
-
-/// Soft limit for the number of flushed updates after which to log progress summary.
-const SOFT_LIMIT_COUNT_FLUSHED_UPDATES: usize = 1_000_000;
 
 /// Storage initialization error type.
 #[derive(Debug, thiserror::Error, Clone)]
@@ -415,27 +410,6 @@ where
     // write state to db
     dump_state(collector, provider_rw, block)?;
 
-    // compute and compare state root. this advances the stage checkpoints.
-    let computed_state_root = compute_state_root(provider_rw)?;
-    if computed_state_root == expected_state_root {
-        info!(target: "reth::cli",
-            ?computed_state_root,
-            "Computed state root matches state root in state dump"
-        );
-    } else {
-        error!(target: "reth::cli",
-            ?computed_state_root,
-            ?expected_state_root,
-            "Computed state root does not match state root in state dump"
-        );
-
-        return Err(InitStorageError::StateRootMismatch(GotExpected {
-            got: computed_state_root,
-            expected: expected_state_root,
-        })
-        .into())
-    }
-
     // insert sync stages for stages that require state
     for stage in StageId::STATE_REQUIRED {
         provider_rw.save_stage_checkpoint(stage, StageCheckpoint::new(block))?;
@@ -545,60 +519,6 @@ where
         }
     }
     Ok(())
-}
-
-/// Computes the state root (from scratch) based on the accounts and storages present in the
-/// database.
-fn compute_state_root<Provider>(provider: &Provider) -> eyre::Result<B256>
-where
-    Provider: DBProvider<Tx: DbTxMut> + TrieWriter,
-{
-    trace!(target: "reth::cli", "Computing state root");
-
-    let tx = provider.tx_ref();
-    let mut intermediate_state: Option<IntermediateStateRootState> = None;
-    let mut total_flushed_updates = 0;
-
-    loop {
-        match StateRootComputer::from_tx(tx)
-            .with_intermediate_state(intermediate_state)
-            .root_with_progress()?
-        {
-            StateRootProgress::Progress(state, _, updates) => {
-                let updated_len = provider.write_trie_updates(&updates)?;
-                total_flushed_updates += updated_len;
-
-                trace!(target: "reth::cli",
-                    last_account_key = %state.last_account_key,
-                    updated_len,
-                    total_flushed_updates,
-                    "Flushing trie updates"
-                );
-
-                intermediate_state = Some(*state);
-
-                if total_flushed_updates % SOFT_LIMIT_COUNT_FLUSHED_UPDATES == 0 {
-                    info!(target: "reth::cli",
-                        total_flushed_updates,
-                        "Flushing trie updates"
-                    );
-                }
-            }
-            StateRootProgress::Complete(root, _, updates) => {
-                let updated_len = provider.write_trie_updates(&updates)?;
-                total_flushed_updates += updated_len;
-
-                trace!(target: "reth::cli",
-                    %root,
-                    updated_len,
-                    total_flushed_updates,
-                    "State root has been computed"
-                );
-
-                return Ok(root)
-            }
-        }
-    }
 }
 
 /// Type to deserialize state root from state dump file.

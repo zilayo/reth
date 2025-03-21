@@ -1,6 +1,5 @@
 use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy};
-use alloy_rpc_types::Log;
-use reth_primitives::{SealedBlock, Transaction};
+use reth_primitives::{Log, SealedBlock, Transaction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

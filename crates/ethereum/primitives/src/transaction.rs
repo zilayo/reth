@@ -21,7 +21,7 @@ use reth_primitives_traits::{
     sync::OnceLock,
     transaction::{
         error::TransactionConversionError,
-        signed::{is_impersonated_tx, RecoveryError, HL_SYSTEM_TX_FROM_ADDR},
+        signed::{is_impersonated_tx, RecoveryError},
     },
     InMemorySize, SignedTransaction,
 };
@@ -836,8 +836,8 @@ impl SignedTransaction for TransactionSigned {
 
     fn recover_signer(&self) -> Result<Address, RecoveryError> {
         let signature = self.signature();
-        if is_impersonated_tx(signature, self.gas_price()) {
-            return Ok(HL_SYSTEM_TX_FROM_ADDR);
+        if let Some(address) = is_impersonated_tx(signature, self.gas_price()) {
+            return Ok(address);
         }
         let signature_hash = self.signature_hash();
         recover_signer(&self.signature, signature_hash)

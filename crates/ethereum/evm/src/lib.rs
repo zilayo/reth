@@ -19,18 +19,35 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use alloy_consensus::{BlockHeader, Header};
+use alloy_evm::eth::EthEvmContext;
 pub use alloy_evm::EthEvm;
-use alloy_evm::EthEvmFactory;
-use alloy_primitives::U256;
+use alloy_primitives::bytes::BufMut;
+use alloy_primitives::hex::{FromHex, ToHexExt};
+use alloy_primitives::{Address, Bytes, U256};
 use core::{convert::Infallible, fmt::Debug};
 use reth_chainspec::{ChainSpec, EthChainSpec, MAINNET};
-use reth_evm::{ConfigureEvm, ConfigureEvmEnv, EvmEnv, NextBlockEnvAttributes};
+use reth_evm::Database;
+use reth_evm::{ConfigureEvm, ConfigureEvmEnv, EvmEnv, EvmFactory, NextBlockEnvAttributes};
 use reth_primitives::TransactionSigned;
+use reth_revm::context::result::{EVMError, HaltReason};
+use reth_revm::context::{Block, Cfg, ContextTr};
+use reth_revm::handler::{EthPrecompiles, PrecompileProvider};
+use reth_revm::inspector::NoOpInspector;
+use reth_revm::interpreter::interpreter::EthInterpreter;
+use reth_revm::interpreter::{Gas, InstructionResult, InterpreterResult};
+use reth_revm::precompile::{
+    PrecompileError, PrecompileErrors, PrecompileFn, PrecompileOutput, PrecompileResult,
+    Precompiles,
+};
 use reth_revm::{
     context::{BlockEnv, CfgEnv, TxEnv},
     context_interface::block::BlobExcessGasAndPrice,
     specification::hardfork::SpecId,
 };
+use reth_revm::{revm, Context, Inspector, MainBuilder, MainContext};
+use sha2::Digest;
+use std::io::Write;
+use std::sync::OnceLock;
 
 mod config;
 use alloy_eips::eip1559::INITIAL_BASE_FEE;
@@ -49,7 +66,7 @@ pub mod eip6110;
 #[derive(Debug, Clone)]
 pub struct EthEvmConfig {
     chain_spec: Arc<ChainSpec>,
-    evm_factory: EthEvmFactory,
+    evm_factory: HyperliquidEvmFactory,
 }
 
 impl EthEvmConfig {
@@ -164,8 +181,153 @@ impl ConfigureEvmEnv for EthEvmConfig {
     }
 }
 
+/// A custom precompile that contains static precompiles.
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct L1ReadPrecompiles<CTX> {
+    precompiles: EthPrecompiles<CTX>,
+    warm_addresses: Vec<Address>,
+}
+
+impl<CTX: ContextTr> L1ReadPrecompiles<CTX> {
+    fn new() -> Self {
+        let mut this = Self { precompiles: EthPrecompiles::default(), warm_addresses: vec![] };
+        this.update_warm_addresses(false);
+        this
+    }
+
+    fn update_warm_addresses(&mut self, precompile_enabled: bool) {
+        self.warm_addresses = if !precompile_enabled {
+            self.precompiles.warm_addresses().collect()
+        } else {
+            self.precompiles
+                .warm_addresses()
+                .chain((0..=9).into_iter().map(|x| {
+                    let mut addr = [0u8; 20];
+                    addr[18] = 0x8;
+                    addr[19] = x;
+                    Address::from_slice(&addr)
+                }))
+                .collect()
+        }
+    }
+}
+
+impl<CTX: ContextTr> PrecompileProvider for L1ReadPrecompiles<CTX> {
+    type Context = CTX;
+    type Output = InterpreterResult;
+
+    fn set_spec(&mut self, spec: <<Self::Context as ContextTr>::Cfg as Cfg>::Spec) {
+        self.precompiles.set_spec(spec);
+        // TODO: How to pass block number and chain id?
+        self.update_warm_addresses(false);
+    }
+
+    fn run(
+        &mut self,
+        context: &mut Self::Context,
+        address: &Address,
+        bytes: &Bytes,
+        gas_limit: u64,
+    ) -> Result<Option<Self::Output>, revm::precompile::PrecompileErrors> {
+        if address[..18] == [0u8; 18] {
+            let maybe_precompile_index = u16::from_be_bytes([address[18], address[19]]);
+            let precompile_base =
+                std::env::var("PRECOMPILE_BASE").unwrap_or("/tmp/precompiles".to_string());
+            if 0x800 <= maybe_precompile_index && maybe_precompile_index <= 0x809 {
+                let block_number = context.block().number();
+                let input = vec![];
+                let mut writer = input.writer();
+                writer.write(&address.as_slice()).unwrap();
+                writer.write(bytes).unwrap();
+                writer.flush().unwrap();
+                let hash = sha2::Sha256::digest(writer.get_ref());
+                let file =
+                    format!("{}/{}/{}.json", precompile_base, block_number, hash.encode_hex());
+                let (output, gas) = match load_result(file) {
+                    Ok(Some(value)) => value,
+                    Ok(None) => {
+                        return Ok(Some(InterpreterResult {
+                            result: InstructionResult::Return,
+                            gas: Gas::new(gas_limit),
+                            output: Bytes::new(),
+                        }))
+                    }
+                    Err(value) => return Err(value),
+                };
+                return Ok(Some(InterpreterResult {
+                    result: InstructionResult::Return,
+                    gas: Gas::new(gas_limit - gas),
+                    output,
+                }));
+            }
+        }
+        self.precompiles.run(context, address, bytes, gas_limit)
+    }
+
+    fn contains(&self, address: &Address) -> bool {
+        self.precompiles.contains(address)
+    }
+
+    fn warm_addresses(&self) -> Box<impl Iterator<Item = Address> + '_> {
+        Box::new(self.warm_addresses.iter().cloned())
+    }
+}
+
+fn load_result(file: String) -> Result<Option<(Bytes, u64)>, PrecompileErrors> {
+    let Ok(file) = std::fs::File::open(file) else {
+        return Ok(None);
+    };
+    let reader = std::io::BufReader::new(file);
+    let json: serde_json::Value = serde_json::from_reader(reader).unwrap();
+    let object = json.as_object().unwrap().clone();
+    let success = object.get("success").unwrap().as_bool().unwrap();
+    if !success {
+        return Err(PrecompileErrors::Error(PrecompileError::other("Invalid input")));
+    }
+    let output =
+        Bytes::from_hex(object.get("output").unwrap().as_str().unwrap().to_owned()).unwrap();
+    let gas = object.get("gas").unwrap_or(&serde_json::json!(0)).as_u64().unwrap_or_default();
+    println!("output: {}, gas: {}", output.encode_hex(), gas);
+    Ok(Some((output, gas)))
+}
+
+/// Custom EVM configuration.
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct HyperliquidEvmFactory;
+
+impl EvmFactory<EvmEnv> for HyperliquidEvmFactory {
+    type Evm<DB: Database, I: Inspector<EthEvmContext<DB>, EthInterpreter>> =
+        EthEvm<DB, I, L1ReadPrecompiles<EthEvmContext<DB>>>;
+    type Tx = TxEnv;
+    type Error<DBError: core::error::Error + Send + Sync + 'static> = EVMError<DBError>;
+    type HaltReason = HaltReason;
+    type Context<DB: Database> = EthEvmContext<DB>;
+
+    fn create_evm<DB: Database>(&self, db: DB, input: EvmEnv) -> Self::Evm<DB, NoOpInspector> {
+        let evm = Context::mainnet()
+            .with_db(db)
+            .with_cfg(input.cfg_env)
+            .with_block(input.block_env)
+            .build_mainnet_with_inspector(NoOpInspector {})
+            .with_precompiles(L1ReadPrecompiles::new());
+
+        EthEvm::new(evm, false)
+    }
+
+    fn create_evm_with_inspector<DB: Database, I: Inspector<Self::Context<DB>, EthInterpreter>>(
+        &self,
+        db: DB,
+        input: EvmEnv,
+        inspector: I,
+    ) -> Self::Evm<DB, I> {
+        EthEvm::new(self.create_evm(db, input).into_inner().with_inspector(inspector), true)
+    }
+}
+
 impl ConfigureEvm for EthEvmConfig {
-    type EvmFactory = EthEvmFactory;
+    type EvmFactory = HyperliquidEvmFactory;
 
     fn evm_factory(&self) -> &Self::EvmFactory {
         &self.evm_factory

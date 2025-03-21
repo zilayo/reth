@@ -10,9 +10,10 @@ use alloy_consensus::{
     SignableTransaction, Transaction,
 };
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
-use alloy_primitives::{keccak256, Address, PrimitiveSignature as Signature, TxHash, B256};
+use alloy_primitives::{keccak256, Address, PrimitiveSignature as Signature, TxHash, B256, U160};
 use core::hash::Hash;
 use revm_primitives::{address, U256};
+use std::ops::Add;
 
 /// Helper trait that unifies all behaviour required by block to support full node operations.
 pub trait FullSignedTx: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
@@ -23,11 +24,20 @@ pub const HL_SYSTEM_TX_FROM_ADDR: Address = address!("22222222222222222222222222
 
 /// Check if the transaction is impersonated.
 /// Signature part is introduced in block_ingest, while the gas_price is trait of hyperliquid system transactions.
-pub fn is_impersonated_tx(signature: &Signature, gas_price: Option<u128>) -> bool {
-    signature.r() == U256::from(1)
-        && signature.s() == U256::from(1)
-        && signature.v() == true
-        && gas_price == Some(0u128)
+pub fn is_impersonated_tx(signature: &Signature, gas_price: Option<u128>) -> Option<Address> {
+    if signature.r() == U256::from(1) && signature.v() == true && gas_price == Some(0u128) {
+        if signature.s() == U256::from(1) {
+            Some(HL_SYSTEM_TX_FROM_ADDR)
+        } else {
+            let s = signature.s().reduce_mod(U256::from(U160::MAX).add(U256::from(1)));
+            let s = U160::from(s);
+            let s: [u8; 20] = s.to_be_bytes();
+            let s = Address::from_slice(&s);
+            Some(s)
+        }
+    } else {
+        None
+    }
 }
 
 /// A signed transaction.
@@ -89,8 +99,8 @@ pub trait SignedTransaction:
     /// Returns `None` if the transaction's signature is invalid, see also
     /// `reth_primitives::transaction::recover_signer_unchecked`.
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
-        if is_impersonated_tx(self.signature(), self.gas_price()) {
-            return Ok(HL_SYSTEM_TX_FROM_ADDR);
+        if let Some(address) = is_impersonated_tx(self.signature(), self.gas_price()) {
+            return Ok(address);
         }
         self.recover_signer_unchecked_with_buf(&mut Vec::new()).map_err(|_| RecoveryError)
     }
@@ -183,8 +193,8 @@ impl SignedTransaction for PooledTransaction {
         buf: &mut Vec<u8>,
     ) -> Result<Address, RecoveryError> {
         let signature = self.signature();
-        if is_impersonated_tx(signature, self.gas_price()) {
-            return Ok(HL_SYSTEM_TX_FROM_ADDR);
+        if let Some(address) = is_impersonated_tx(signature, self.gas_price()) {
+            return Ok(address);
         }
         match self {
             Self::Legacy(tx) => tx.tx().encode_for_signing(buf),

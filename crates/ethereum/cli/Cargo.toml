@@ -21,7 +21,15 @@ eyre.workspace = true
 once_cell.workspace = true
 alloy-chains.workspace = true
 alloy-primitives.workspace = true
+alloy-genesis.workspace = true
+alloy-consensus.workspace = true
+alloy-rlp.workspace = true
 serde_json.workspace = true
+lz4_flex.workspace = true
+revm = { workspace = true, features = ["serde"] }
+serde.workspace = true
+rmp-serde.workspace = true
+reqwest = { workspace = true }
 
 [dev-dependencies]
 clap.workspace = true

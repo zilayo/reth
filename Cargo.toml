@@ -622,6 +622,9 @@ snmalloc-rs = { version = "0.3.7", features = ["build_cc"] }
 # See: https://github.com/eira-fransham/crunchy/issues/13
 crunchy = "=0.2.2"
 
+lz4_flex = "0.11.3"
+rmp-serde = "1.3.0"
+
 [patch.crates-io]
 alloy-evm = { git = "https://github.com/alloy-rs/evm", rev = "beb6832" }
 alloy-op-evm = { git = "https://github.com/alloy-rs/evm", rev = "beb6832" }
