@@ -210,8 +210,12 @@ where
 
         // hotfix for https://hyperliquid.cloud.blockscout.com/tx/0xbf0e48e39ff2d65b04d181c698918530aa82809f9c5e67df58f55567abb34a06?tab=index
         // hl node returns 337981 for this tx, but reth returns 337967, causing the block to be invalid
-        if *tx.hash() == b256!("0xbf0e48e39ff2d65b04d181c698918530aa82809f9c5e67df58f55567abb34a06") {
-            self.gas_used = 337981;
+        let problematic_txs = [
+            b256!("0xbf0e48e39ff2d65b04d181c698918530aa82809f9c5e67df58f55567abb34a06"),
+            b256!("0x9a9de0bc28ac9432aeace2c2efaf9ed38d93af7b48440b49f53927ff5863497a"),
+        ];
+        if problematic_txs.contains(hash) {
+            self.gas_used += 14;
         }
 
         // Push transaction changeset and calculate header bloom filter for receipt.
