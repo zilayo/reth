@@ -6,6 +6,7 @@ static ALLOC: reth_cli_util::allocator::Allocator = reth_cli_util::allocator::ne
 mod block_ingest;
 mod forwarder;
 mod serialized;
+mod spot_meta;
 
 use std::path::PathBuf;
 
