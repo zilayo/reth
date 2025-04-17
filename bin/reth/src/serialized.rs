@@ -1,22 +1,23 @@
-use alloy_primitives::{Address, Bytes, Log};
+use alloy_primitives::{Address, Log};
+use reth_hyperliquid_types::{ReadPrecompileInput, ReadPrecompileResult};
 use reth_primitives::{SealedBlock, Transaction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct BlockAndReceipts {
-    pub(crate) block: EvmBlock,
-    pub(crate) receipts: Vec<LegacyReceipt>,
+    pub block: EvmBlock,
+    pub receipts: Vec<LegacyReceipt>,
     #[serde(default)]
-    pub(crate) system_txs: Vec<SystemTx>,
+    pub system_txs: Vec<SystemTx>,
     #[serde(default)]
-    pub(crate) read_precompile_calls:
-        Vec<(Address, Vec<(ReadPrecompileInput, ReadPrecompileResult)>)>,
+    pub read_precompile_calls: Vec<(Address, Vec<(ReadPrecompileInput, ReadPrecompileResult)>)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum EvmBlock {
     Reth115(SealedBlock),
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct LegacyReceipt {
@@ -37,20 +38,6 @@ enum LegacyTxType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SystemTx {
-    pub(crate) tx: Transaction,
-    pub(crate) receipt: Option<LegacyReceipt>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
-pub(crate) struct ReadPrecompileInput {
-    pub(crate) input: Bytes,
-    pub(crate) gas_limit: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum ReadPrecompileResult {
-    Ok { gas_used: u64, bytes: Bytes },
-    OutOfGas,
-    Error,
-    UnexpectedError,
+    pub tx: Transaction,
+    pub receipt: Option<LegacyReceipt>,
 }

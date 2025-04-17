@@ -6686,6 +6686,7 @@ dependencies = [
  "reth-execution-types",
  "reth-exex",
  "reth-fs-util",
+ "reth-hyperliquid-types",
  "reth-network",
  "reth-network-api",
  "reth-network-p2p",
@@ -7394,6 +7395,7 @@ dependencies = [
  "reth-chain-state",
  "reth-errors",
  "reth-execution-types",
+ "reth-hyperliquid-types",
  "reth-payload-builder-primitives",
  "reth-payload-primitives",
  "reth-primitives",
@@ -7803,15 +7805,20 @@ dependencies = [
  "alloy-genesis",
  "alloy-primitives",
  "alloy-sol-types",
+ "lz4_flex",
+ "parking_lot",
  "reth-chainspec",
  "reth-ethereum-forks",
  "reth-evm",
  "reth-execution-types",
+ "reth-hyperliquid-types",
  "reth-primitives",
  "reth-primitives-traits",
  "reth-revm",
  "reth-testing-utils",
+ "rmp-serde",
  "secp256k1 0.30.0",
+ "serde",
  "serde_json",
  "sha2 0.10.8",
 ]
@@ -7952,6 +7959,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.11",
+]
+
+[[package]]
+name = "reth-hyperliquid-types"
+version = "1.2.0"
+dependencies = [
+ "alloy-primitives",
+ "clap",
+ "reth-cli-commands",
+ "serde",
 ]
 
 [[package]]

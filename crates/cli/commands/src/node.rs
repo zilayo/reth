@@ -114,6 +114,10 @@ pub struct NodeCommand<
     /// Additional cli arguments
     #[command(flatten, next_help_heading = "Extension")]
     pub ext: Ext,
+
+    /// EVM blocks base directory
+    #[arg(long, default_value = "/tmp/evm-blocks")]
+    pub ingest_dir: PathBuf,
 }
 
 impl<C: ChainSpecParser> NodeCommand<C> {
@@ -165,6 +169,7 @@ impl<
             pruning,
             ext,
             engine,
+            ingest_dir,
         } = self;
 
         // set up node config
@@ -183,6 +188,7 @@ impl<
             dev,
             pruning,
             engine,
+            ingest_dir: Some(ingest_dir),
         };
 
         let data_dir = node_config.datadir();

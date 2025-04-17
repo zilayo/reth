@@ -8,8 +8,6 @@ mod forwarder;
 mod serialized;
 mod spot_meta;
 
-use std::path::PathBuf;
-
 use block_ingest::BlockIngest;
 use clap::{Args, Parser};
 use forwarder::EthForwarderApiServer;
@@ -20,10 +18,6 @@ use tracing::info;
 
 #[derive(Args, Debug, Clone)]
 struct HyperliquidExtArgs {
-    /// EVM blocks base directory
-    #[arg(long, default_value = "/tmp/evm-blocks")]
-    pub ingest_dir: PathBuf,
-
     /// Upstream RPC URL to forward incoming transactions.
     #[arg(long, default_value = "https://rpc.hyperliquid.xyz/evm")]
     pub upstream_rpc_url: String,
@@ -38,12 +32,13 @@ fn main() {
     }
 
     if let Err(err) = Cli::<EthereumChainSpecParser, HyperliquidExtArgs>::parse().run(
-        |builder, ingest_args| async move {
+        |builder, ext_args| async move {
+            let ingest_dir = builder.config().ingest_dir.clone().expect("ingest dir not set");
             info!(target: "reth::cli", "Launching node");
             let handle = builder
                 .node(EthereumNode::default())
                 .extend_rpc_modules(move |ctx| {
-                    let upstream_rpc_url = ingest_args.upstream_rpc_url.clone();
+                    let upstream_rpc_url = ext_args.upstream_rpc_url.clone();
                     let rpc = forwarder::EthForwarderExt::new(upstream_rpc_url).into_rpc();
                     for method_name in rpc.method_names() {
                         ctx.modules.remove_method_from_configured(method_name);
@@ -56,7 +51,6 @@ fn main() {
                 .launch()
                 .await?;
 
-            let ingest_dir = ingest_args.ingest_dir;
             let ingest = BlockIngest(ingest_dir);
             ingest.run(handle.node).await.unwrap();
             handle.node_exit_future.await

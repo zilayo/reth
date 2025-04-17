@@ -129,6 +129,7 @@ members = [
     "crates/trie/parallel/",
     "crates/trie/sparse",
     "crates/trie/trie",
+    "crates/hyperliquid-types",
     "examples/beacon-api-sidecar-fetcher/",
     "examples/beacon-api-sse/",
     "examples/bsc-p2p",
@@ -622,6 +623,8 @@ snmalloc-rs = { version = "0.3.7", features = ["build_cc"] }
 # See: https://github.com/eira-fransham/crunchy/issues/13
 crunchy = "=0.2.2"
 
+# hyperliquid
+reth-hyperliquid-types = { path = "crates/hyperliquid-types" }
 lz4_flex = "0.11.3"
 rmp-serde = "1.3.0"
 
