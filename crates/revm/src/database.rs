@@ -159,7 +159,8 @@ impl<DB: EvmStateProvider> DatabaseRef for StateProviderDatabase<DB> {
     ///
     /// Returns `Ok` with the block hash if found, or the default hash otherwise.
     fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
-        if number >= 270000 {
+        const NON_PLACEHOLDER_BLOCK_HASH_HEIGHT: u64 = 243_538;
+        if number >= NON_PLACEHOLDER_BLOCK_HASH_HEIGHT {
             // Get the block hash or default hash with an attempt to convert U256 block number to u64
             Ok(self.0.block_hash(number)?.unwrap_or_default())
         } else {

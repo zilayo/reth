@@ -20,14 +20,14 @@ pub trait FullSignedTx: SignedTransaction + MaybeCompact + MaybeSerdeBincodeComp
 impl<T> FullSignedTx for T where T: SignedTransaction + MaybeCompact + MaybeSerdeBincodeCompat {}
 
 /// Hyperliquid system transaction from address.
-pub const HL_SYSTEM_TX_FROM_ADDR: Address = address!("2222222222222222222222222222222222222222");
+pub const NATIVE_TOKEN_SYSTEM_ADDRESS: Address = address!("2222222222222222222222222222222222222222");
 
 /// Check if the transaction is impersonated.
 /// Signature part is introduced in block_ingest, while the gas_price is trait of hyperliquid system transactions.
 pub fn is_impersonated_tx(signature: &Signature, gas_price: Option<u128>) -> Option<Address> {
     if signature.r() == U256::from(1) && signature.v() == true && gas_price == Some(0u128) {
         if signature.s() == U256::from(1) {
-            Some(HL_SYSTEM_TX_FROM_ADDR)
+            Some(NATIVE_TOKEN_SYSTEM_ADDRESS)
         } else {
             let s = signature.s().reduce_mod(U256::from(U160::MAX).add(U256::from(1)));
             let s = U160::from(s);
