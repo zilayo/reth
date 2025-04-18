@@ -10,7 +10,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 pub(crate) fn load_hl_testnet() -> ChainSpec {
-    const TESTNET_GENESIS_URL: &str = "https://raw.githubusercontent.com/sprites0/hl-testnet-genesis/main/19386700.rlp";
+    const TESTNET_GENESIS_URL: &str = "https://raw.githubusercontent.com/sprites0/hl-testnet-genesis/main/21043587.rlp";
 
     fn download_testnet_genesis() -> Result<&'static str, Box<dyn std::error::Error>> {
         let path = "/tmp/hl_testnet.rmp.lz4";
