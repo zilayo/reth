@@ -2,7 +2,7 @@
 
 Hyperliquid archive node based on [reth](https://github.com/paradigmxyz/reth).
 
-## System Transactions Appear as Pseudo Transactions
+## ⚠️ IMPORTANT: System Transactions Appear as Pseudo Transactions
 
 Deposit transactions from `0x222..22` to user addresses are intentionally recorded as pseudo transactions.
 This change simplifies block explorers, making it easier to track deposit timestamps.
