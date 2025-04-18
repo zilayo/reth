@@ -76,10 +76,12 @@ impl<CTX: ContextTr> PrecompileProvider for ReplayPrecompile<CTX> {
     }
 
     fn contains(&self, address: &Address) -> bool {
-        self.precompiles.contains(address)
+        self.precompiles.contains(address) || self.cache.read().get(address).is_some()
     }
 
     fn warm_addresses(&self) -> Box<impl Iterator<Item = Address> + '_> {
-        Box::new(self.precompiles.warm_addresses())
+        let addresses: Vec<Address> =
+            self.precompiles.warm_addresses().chain(self.cache.read().keys().cloned()).collect();
+        Box::new(addresses.into_iter())
     }
 }
