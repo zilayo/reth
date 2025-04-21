@@ -63,7 +63,12 @@ impl<CTX: ContextTr> PrecompileProvider for ReplayPrecompile<CTX> {
                     result.output = bytes.clone();
                     Ok(Some(result))
                 }
-                ReadPrecompileResult::OutOfGas => Err(PrecompileError::OutOfGas.into()),
+                ReadPrecompileResult::OutOfGas => {
+                    // Use all the gas passed to this precompile
+                    result.gas.spend_all();
+                    result.result = InstructionResult::OutOfGas;
+                    Ok(Some(result))
+                }
                 ReadPrecompileResult::Error => {
                     Err(PrecompileError::other("precompile failed").into())
                 }
