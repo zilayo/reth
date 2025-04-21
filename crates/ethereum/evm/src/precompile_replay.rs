@@ -70,7 +70,9 @@ impl<CTX: ContextTr> PrecompileProvider for ReplayPrecompile<CTX> {
                     Ok(Some(result))
                 }
                 ReadPrecompileResult::Error => {
-                    Err(PrecompileError::other("precompile failed").into())
+                    result.gas.spend_all();
+                    result.result = InstructionResult::PrecompileError;
+                    Ok(Some(result))
                 }
                 ReadPrecompileResult::UnexpectedError => panic!("unexpected precompile error"),
             };
