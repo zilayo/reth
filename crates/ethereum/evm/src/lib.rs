@@ -203,24 +203,6 @@ pub(crate) enum EvmBlock {
     Reth115(SealedBlock),
 }
 
-fn load_result(file: String) -> Result<Option<(Bytes, u64)>, PrecompileErrors> {
-    let Ok(file) = std::fs::File::open(file) else {
-        return Ok(None);
-    };
-    let reader = std::io::BufReader::new(file);
-    let json: serde_json::Value = serde_json::from_reader(reader).unwrap();
-    let object = json.as_object().unwrap().clone();
-    let success = object.get("success").unwrap().as_bool().unwrap();
-    if !success {
-        return Err(PrecompileErrors::Error(PrecompileError::other("Invalid input")));
-    }
-    let output =
-        Bytes::from_hex(object.get("output").unwrap().as_str().unwrap().to_owned()).unwrap();
-    let gas = object.get("gas").unwrap_or(&serde_json::json!(0)).as_u64().unwrap_or_default();
-    println!("output: {}, gas: {}", output.encode_hex(), gas);
-    Ok(Some((output, gas)))
-}
-
 /// Custom EVM configuration.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
