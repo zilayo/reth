@@ -56,7 +56,13 @@ impl<CTX: ContextTr> PrecompileProvider for ReplayPrecompile<CTX> {
                 output: Bytes::new(),
             };
 
-            return match *precompile_calls.get(&input).expect("missing precompile call") {
+            let Some(get) = precompile_calls.get(&input) else {
+                result.gas.spend_all();
+                result.result = InstructionResult::PrecompileError;
+                return Ok(Some(result))
+            };
+
+            return match *get {
                 ReadPrecompileResult::Ok { gas_used, ref bytes } => {
                     let underflow = result.gas.record_cost(gas_used);
                     assert!(underflow, "Gas underflow is not possible");
