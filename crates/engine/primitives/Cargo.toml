@@ -31,6 +31,9 @@ alloy-eips.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 futures.workspace = true
 
+# hyperevm
+reth-hyperliquid-types.workspace = true
+
 # misc
 auto_impl.workspace = true
 serde.workspace = true

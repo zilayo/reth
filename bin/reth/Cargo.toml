@@ -64,6 +64,7 @@ reth-node-events.workspace = true
 reth-node-metrics.workspace = true
 reth-consensus.workspace = true
 reth-prune.workspace = true
+reth-hyperliquid-types.workspace = true
 
 # crypto
 alloy-eips = { workspace = true, features = ["kzg"] }

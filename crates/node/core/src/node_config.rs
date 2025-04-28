@@ -145,6 +145,9 @@ pub struct NodeConfig<ChainSpec> {
 
     /// All engine related arguments
     pub engine: EngineArgs,
+
+    /// The ingest directory for the node.
+    pub ingest_dir: Option<PathBuf>,
 }
 
 impl NodeConfig<ChainSpec> {
@@ -174,6 +177,7 @@ impl<ChainSpec> NodeConfig<ChainSpec> {
             pruning: PruningArgs::default(),
             datadir: DatadirArgs::default(),
             engine: EngineArgs::default(),
+            ingest_dir: None,
         }
     }
 
@@ -465,6 +469,7 @@ impl<ChainSpec> NodeConfig<ChainSpec> {
             dev: self.dev,
             pruning: self.pruning,
             engine: self.engine,
+            ingest_dir: self.ingest_dir,
         }
     }
 }
@@ -492,6 +497,7 @@ impl<ChainSpec> Clone for NodeConfig<ChainSpec> {
             pruning: self.pruning.clone(),
             datadir: self.datadir.clone(),
             engine: self.engine.clone(),
+            ingest_dir: self.ingest_dir.clone(),
         }
     }
 }

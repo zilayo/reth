@@ -37,7 +37,7 @@ use reth_provider::{
 use reth_tasks::TaskExecutor;
 use reth_transaction_pool::{PoolConfig, PoolTransaction, TransactionPool};
 use secp256k1::SecretKey;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tracing::{info, trace, warn};
 
 pub mod add_ons;
@@ -749,6 +749,10 @@ impl<Node: FullNodeTypes> BuilderContext<Node> {
         Node::Types: NodeTypes<ChainSpec: Hardforks>,
     {
         network_builder.build(self.provider.clone())
+    }
+
+    pub fn ingest_dir(&self) -> PathBuf {
+        self.config().ingest_dir.clone().expect("ingest dir not set")
     }
 }
 

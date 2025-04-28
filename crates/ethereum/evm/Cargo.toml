@@ -31,6 +31,12 @@ alloy-consensus.workspace = true
 
 sha2.workspace = true
 serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
+rmp-serde.workspace = true
+lz4_flex.workspace = true
+
+reth-hyperliquid-types.workspace = true
+parking_lot.workspace = true
 
 [dev-dependencies]
 reth-testing-utils.workspace = true

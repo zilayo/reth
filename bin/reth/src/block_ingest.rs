@@ -15,58 +15,17 @@ use reth_node_builder::EngineTypes;
 use reth_node_builder::NodeTypesWithEngine;
 use reth_node_builder::{rpc::RethRpcAddOns, FullNode};
 use reth_payload_builder::{EthBuiltPayload, EthPayloadBuilderAttributes, PayloadId};
-use reth_primitives::TransactionSigned;
+use reth_primitives::{Transaction as TypedTransaction, TransactionSigned};
 use reth_provider::{BlockHashReader, StageCheckpointReader};
 use reth_rpc_api::EngineApiClient;
 use reth_rpc_layer::AuthClientService;
 use reth_stages::StageId;
-use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
-use crate::serialized::TypedTransaction;
-use crate::serialized::{self, BlockInner};
+use crate::serialized::{BlockAndReceipts, EvmBlock};
+use crate::spot_meta::erc20_contract_to_spot_token;
 
 pub(crate) struct BlockIngest(pub PathBuf);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct EvmContract {
-    pub address: Address,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SpotToken {
-    pub index: u64,
-    #[serde(rename = "evmContract")]
-    pub evm_contract: Option<EvmContract>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SpotMeta {
-    tokens: Vec<SpotToken>,
-}
-
-async fn fetch_spot_meta(is_testnet: bool) -> Result<SpotMeta, Box<dyn std::error::Error>> {
-    let url = if is_testnet {
-        "https://api.hyperliquid-testnet.xyz"
-    } else {
-        "https://api.hyperliquid.xyz"
-    };
-    let url = format!("{}/info", url);
-    // post body: {"type": "spotMeta"}
-    let client = reqwest::Client::new();
-    let response = client.post(url).json(&serde_json::json!({"type": "spotMeta"})).send().await?;
-    Ok(response.json().await?)
-}
-
-fn to_evm_map(meta: &SpotMeta) -> std::collections::HashMap<Address, u64> {
-    let mut map = std::collections::HashMap::new();
-    for token in &meta.tokens {
-        if let Some(evm_contract) = &token.evm_contract {
-            map.insert(evm_contract.address, token.index);
-        }
-    }
-    map
-}
 
 async fn submit_payload<Engine: PayloadTypes + EngineTypes>(
     engine_api_client: &HttpClient<AuthClientService<HttpBackend>>,
@@ -95,7 +54,7 @@ async fn submit_payload<Engine: PayloadTypes + EngineTypes>(
 }
 
 impl BlockIngest {
-    pub(crate) fn collect_block(&self, height: u64) -> Option<super::serialized::Block> {
+    pub(crate) fn collect_block(&self, height: u64) -> Option<BlockAndReceipts> {
         let f = ((height - 1) / 1_000_000) * 1_000_000;
         let s = ((height - 1) / 1_000) * 1_000;
         let path = format!("{}/{f}/{s}/{height}.rmp.lz4", self.0.to_string_lossy());
@@ -103,7 +62,7 @@ impl BlockIngest {
             let file = std::fs::File::open(path).unwrap();
             let file = std::io::BufReader::new(file);
             let mut decoder = lz4_flex::frame::FrameDecoder::new(file);
-            let blocks: Vec<serialized::Block> = rmp_serde::from_read(&mut decoder).unwrap();
+            let blocks: Vec<BlockAndReceipts> = rmp_serde::from_read(&mut decoder).unwrap();
             Some(blocks[0].clone())
         } else {
             None
@@ -135,14 +94,14 @@ impl BlockIngest {
             std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
 
         let engine_api = node.auth_server_handle().http_client();
-        let mut evm_map = to_evm_map(&fetch_spot_meta(node.chain_spec().chain_id() == 998).await?);
+        let mut evm_map = erc20_contract_to_spot_token(node.chain_spec().chain_id()).await?;
 
         loop {
             let Some(original_block) = self.collect_block(height) else {
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 continue;
             };
-            let BlockInner::Reth115(mut block) = original_block.block;
+            let EvmBlock::Reth115(mut block) = original_block.block;
             {
                 debug!(target: "reth::cli", ?block, "Built new payload");
                 let timestamp = block.header().timestamp();
@@ -153,38 +112,28 @@ impl BlockIngest {
                         std::mem::take(block.body_mut());
                     let mut system_txs = vec![];
                     for transaction in original_block.system_txs {
-                        let s = match &transaction.tx {
-                            TypedTransaction::Legacy(tx) => match tx.input().len() {
-                                0 => U256::from(0x1),
-                                _ => {
-                                    let TxKind::Call(to) = tx.to else {
-                                        panic!("Unexpected contract creation");
-                                    };
-                                    loop {
-                                        match evm_map.get(&to).cloned() {
-                                            Some(s) => {
-                                                break {
-                                                    let mut addr = [0u8; 32];
-                                                    addr[12] = 0x20;
-                                                    addr[24..32].copy_from_slice(s.to_be_bytes().as_ref());
-                                                    U256::from_be_bytes(addr)
-                                                }
-                                            }
-                                            None => {
-                                                info!("Contract not found: {:?}, fetching again...", to);
-                                                evm_map = to_evm_map(
-                                                    &fetch_spot_meta(
-                                                        node.chain_spec().chain_id() == 998,
-                                                    )
-                                                    .await?,
-                                                );
-                                                continue;
-                                            }
-                                        }
-                                    }
+                        let TypedTransaction::Legacy(tx) = &transaction.tx else {
+                            panic!("Unexpected transaction type");
+                        };
+                        let TxKind::Call(to) = tx.to else {
+                            panic!("Unexpected contract creation");
+                        };
+                        let s = if tx.input().is_empty() {
+                            U256::from(0x1)
+                        } else {
+                            loop {
+                                if let Some(spot) = evm_map.get(&to) {
+                                    break spot.to_s();
                                 }
-                            },
-                            _ => unreachable!(),
+
+                                info!(
+                                    "Contract not found: {:?} from spot mapping, fetching again...",
+                                    to
+                                );
+                                evm_map =
+                                    erc20_contract_to_spot_token(node.chain_spec().chain_id())
+                                        .await?;
+                            }
                         };
                         let signature = PrimitiveSignature::new(
                             // from anvil
@@ -192,7 +141,7 @@ impl BlockIngest {
                             s,
                             true,
                         );
-                        let typed_transaction = transaction.tx.to_reth();
+                        let typed_transaction = transaction.tx;
                         let tx = TransactionSigned::new(
                             typed_transaction,
                             signature,
