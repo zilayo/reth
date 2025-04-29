@@ -56,6 +56,7 @@ impl<C: ChainSpecParser<ChainSpec = OpChainSpec>> InitStateCommandOp<C> {
             if last_block_number == 0 {
                 reth_cli_commands::init_state::without_evm::setup_without_evm(
                     &provider_rw,
+                    last_block_number + 1,
                     SealedHeader::new(BEDROCK_HEADER, BEDROCK_HEADER_HASH),
                     BEDROCK_HEADER_TTD,
                 )?;

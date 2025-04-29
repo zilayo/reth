@@ -12,7 +12,7 @@ use reth_provider::{
     BlockNumReader, DatabaseProviderFactory, StaticFileProviderFactory, StaticFileWriter,
 };
 use std::{io::BufReader, path::PathBuf, str::FromStr};
-use tracing::info;
+use tracing::{info, warn};
 
 pub mod without_evm;
 
@@ -40,7 +40,7 @@ pub struct InitStateCommand<C: ChainSpecParser> {
     /// Allows init at a non-genesis block. Caution! Blocks must be manually imported up until
     /// and including the non-genesis block to init chain at. See 'import' command.
     #[arg(value_name = "STATE_DUMP_FILE", verbatim_doc_comment)]
-    pub state: PathBuf,
+    pub state: Option<PathBuf>,
 
     /// Specifies whether to initialize the state without relying on EVM historical data.
     ///
@@ -63,6 +63,10 @@ pub struct InitStateCommand<C: ChainSpecParser> {
     /// Hash of the header.
     #[arg(long, value_name = "HEADER_HASH", verbatim_doc_comment)]
     pub header_hash: Option<String>,
+
+    /// Force the initialization of the state even if the data directory is not empty.
+    #[arg(long)]
+    pub force: bool,
 }
 
 impl<C: ChainSpecParser<ChainSpec: EthChainSpec + EthereumHardforks>> InitStateCommand<C> {
@@ -98,36 +102,48 @@ impl<C: ChainSpecParser<ChainSpec: EthChainSpec + EthereumHardforks>> InitStateC
             let last_block_number = provider_rw.last_block_number()?;
 
             if last_block_number == 0 {
-                without_evm::setup_without_evm(
-                    &provider_rw,
-                    // &header,
-                    // header_hash,
-                    SealedHeader::new(header, header_hash),
-                    total_difficulty,
-                )?;
-
-                // SAFETY: it's safe to commit static files, since in the event of a crash, they
-                // will be unwound according to database checkpoints.
-                //
-                // Necessary to commit, so the header is accessible to provider_rw and
-                // init_state_dump
-                static_file_provider.commit()?;
+                info!(target: "reth::cli", "Data directory is empty, setting up dummy chain");
             } else if last_block_number > 0 && last_block_number < header.number {
-                return Err(eyre::eyre!(
-                    "Data directory should be empty when calling init-state with --without-evm-history."
-                ));
+                if !self.force {
+                    return Err(eyre::eyre!(
+                        "Data directory is not empty, use --force to override"
+                    ));
+                } else {
+                    warn!(target: "reth::cli", "Data directory is not empty, setting up dummy chain");
+                }
             }
+
+            info!(target: "reth::cli", "Setting up dummy chain from block {} to {}",
+                last_block_number + 1,
+                header.number);
+            without_evm::setup_without_evm(
+                &provider_rw,
+                // &header,
+                // header_hash,
+                last_block_number + 1,
+                SealedHeader::new(header, header_hash),
+                total_difficulty,
+            )?;
+
+            // SAFETY: it's safe to commit static files, since in the event of a crash, they
+            // will be unwound according to database checkpoints.
+            //
+            // Necessary to commit, so the header is accessible to provider_rw and
+            // init_state_dump
+            static_file_provider.commit()?;
         }
 
-        info!(target: "reth::cli", "Initiating state dump");
+        if let Some(state) = self.state {
+            info!(target: "reth::cli", "Initiating state dump");
+            let reader = BufReader::new(reth_fs_util::open(state)?);
+            let hash = init_from_state_dump(reader, &provider_rw, config.stages.etl)?;
+            provider_rw.commit()?;
 
-        let reader = BufReader::new(reth_fs_util::open(self.state)?);
-
-        let hash = init_from_state_dump(reader, &provider_rw, config.stages.etl)?;
-
-        provider_rw.commit()?;
-
-        info!(target: "reth::cli", hash = ?hash, "Genesis block written");
-        Ok(())
+            info!(target: "reth::cli", hash = ?hash, "Genesis block written");
+            Ok(())
+        } else {
+            provider_rw.commit()?;
+            Ok(())
+        }
     }
 }

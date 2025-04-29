@@ -27,6 +27,7 @@ pub(crate) fn read_header_from_file(path: PathBuf) -> Result<Header, eyre::Error
 /// first valid block.
 pub fn setup_without_evm<Provider>(
     provider_rw: &Provider,
+    start_height: BlockNumber,
     header: SealedHeader<<Provider::Primitives as NodePrimitives>::BlockHeader>,
     total_difficulty: U256,
 ) -> Result<(), eyre::Error>
@@ -39,7 +40,7 @@ where
 
     let static_file_provider = provider_rw.static_file_provider();
     // Write EVM dummy data up to `header - 1` block
-    append_dummy_chain(&static_file_provider, header.number() - 1)?;
+    append_dummy_chain(&static_file_provider, start_height, header.number() - 1)?;
 
     info!(target: "reth::cli", "Appending first valid block.");
 
@@ -99,6 +100,7 @@ where
 /// * Receipts: It will not push any receipt, only increments the end block range.
 fn append_dummy_chain<N: NodePrimitives<BlockHeader = Header>>(
     sf_provider: &StaticFileProvider<N>,
+    start_height: BlockNumber,
     target_height: BlockNumber,
 ) -> Result<(), eyre::Error> {
     let (tx, rx) = std::sync::mpsc::channel();
@@ -109,7 +111,7 @@ fn append_dummy_chain<N: NodePrimitives<BlockHeader = Header>>(
         let provider = sf_provider.clone();
         std::thread::spawn(move || {
             let result = provider.latest_writer(segment).and_then(|mut writer| {
-                for block_num in 1..=target_height {
+                for block_num in start_height..=target_height {
                     writer.increment_block(block_num)?;
                 }
                 Ok(())
@@ -124,7 +126,7 @@ fn append_dummy_chain<N: NodePrimitives<BlockHeader = Header>>(
     std::thread::spawn(move || {
         let mut empty_header = Header::default();
         let result = provider.latest_writer(StaticFileSegment::Headers).and_then(|mut writer| {
-            for block_num in 1..=target_height {
+            for block_num in start_height..=target_height {
                 // TODO: should we fill with real parent_hash?
                 empty_header.number = block_num;
                 writer.append_header(&empty_header, U256::ZERO, &B256::ZERO)?;
