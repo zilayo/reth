@@ -4,23 +4,29 @@
 static ALLOC: reth_cli_util::allocator::Allocator = reth_cli_util::allocator::new_allocator();
 
 mod block_ingest;
-mod forwarder;
+mod call_forwarder;
 mod serialized;
 mod spot_meta;
+mod tx_forwarder;
 
 use block_ingest::BlockIngest;
+use call_forwarder::CallForwarderApiServer;
 use clap::{Args, Parser};
-use forwarder::EthForwarderApiServer;
 use reth::cli::Cli;
 use reth_ethereum_cli::chainspec::EthereumChainSpecParser;
 use reth_node_ethereum::EthereumNode;
 use tracing::info;
+use tx_forwarder::EthForwarderApiServer;
 
 #[derive(Args, Debug, Clone)]
 struct HyperliquidExtArgs {
     /// Upstream RPC URL to forward incoming transactions.
     #[arg(long, default_value = "https://rpc.hyperliquid.xyz/evm")]
     pub upstream_rpc_url: String,
+
+    /// Forward eth_call and eth_estimateGas to the upstream RPC.
+    #[arg(long)]
+    pub forward_call: bool,
 }
 
 fn main() {
@@ -38,12 +44,17 @@ fn main() {
             let handle = builder
                 .node(EthereumNode::default())
                 .extend_rpc_modules(move |ctx| {
-                    let upstream_rpc_url = ext_args.upstream_rpc_url.clone();
-                    let rpc = forwarder::EthForwarderExt::new(upstream_rpc_url).into_rpc();
-                    for method_name in rpc.method_names() {
-                        ctx.modules.remove_method_from_configured(method_name);
+                    let upstream_rpc_url = ext_args.upstream_rpc_url;
+                    ctx.modules.replace_configured(
+                        tx_forwarder::EthForwarderExt::new(upstream_rpc_url.clone()).into_rpc(),
+                    )?;
+
+                    if ext_args.forward_call {
+                        ctx.modules.replace_configured(
+                            call_forwarder::CallForwarderExt::new(upstream_rpc_url.clone())
+                                .into_rpc(),
+                        )?;
                     }
-                    ctx.modules.merge_configured(rpc)?;
 
                     info!("Transaction forwarder extension enabled");
                     Ok(())

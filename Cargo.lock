@@ -6653,6 +6653,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types",
+ "alloy-rpc-types-eth",
  "aquamarine",
  "backon",
  "clap",
